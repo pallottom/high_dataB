@@ -1,0 +1,11 @@
+from sqlalchemy import Column, Integer, String, JSON, UniqueConstraint
+from sqlalchemy.orm import relationship
+from database import Base
+
+class Measurement(Base):
+    __tablename__ = 'measurements'
+    id = Column(Integer, primary_key=True)
+    name = Column(String, nullable=False)
+    instrument_name = Column(String, nullable=False)
+    settings = Column(JSON, nullable=True)
+    experiments = relationship("Experiment", back_populates="measurement")
