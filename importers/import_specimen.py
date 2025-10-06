@@ -1,9 +1,9 @@
-from models import SpecimenType, DonorType, CellType, HumanDonor
+from models import Specimen, DonorType, CellSpecimen, HumanDonor
 
 def import_specimen(session, donor_id, row):
-    specimen_type = session.query(SpecimenType).filter_by(name="cell").first()
+    specimen_type = session.query(Specimen).filter_by(type="cell").first()
     if not specimen_type:
-        specimen_type = SpecimenType(name="cell")
+        specimen_type = Specimen(name="cell")
         session.add(specimen_type)
 
     donor_type = session.query(DonorType).filter_by(name="human").first()
@@ -11,9 +11,9 @@ def import_specimen(session, donor_id, row):
         donor_type = DonorType(name="human")
         session.add(donor_type)
 
-    cell_type = session.query(CellType).filter_by(name="PBMC").first()
+    cell_type = session.query(CellSpecimen).filter_by(name="PBMC").first()
     if not cell_type:
-        cell_type = CellType(name="PBMC", specimen_type=specimen_type, donor_type=donor_type)
+        cell_type = CellSpecimen(name="PBMC", specimen_type=specimen_type, donor_type=donor_type)
         session.add(cell_type)
 
     human_donor = session.query(HumanDonor).filter_by(name=str(donor_id)).first()
