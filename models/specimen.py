@@ -1,113 +1,96 @@
-from sqlalchemy import Integer, String, Float, Column, ForeignKey
+from sqlalchemy import Integer, String, Column, ForeignKey, Sequence
 from sqlalchemy.orm import relationship
 from database import Base
 
-
-"""from sqlalchemy import Enum
-SpecimenTypeEnum = Enum("cell", "bacteria", "virus", "unknown", name="specimen_type")
-type = Column(SpecimenTypeEnum, nullable=False)
-"""
-
-
-
+# Shared sequence for unique IDs across all specimen types
+specimen_id_seq = Sequence('specimen_id_seq', start=1)
 
 class Specimen(Base):
-    __tablename__ = "specimens"
-    id = Column(Integer, primary_key=True, autoincrement=True)
-    type = Column(String, nullable=False)  # example: "cell", "bacteria", "virus"
+    __tablename__ = "specimens"  # Must be a real table for inheritance
+    id = Column(Integer, specimen_id_seq, primary_key=True, server_default=specimen_id_seq.next_value())
+    type = Column(String(50), nullable=False)  # "human", "mouse", "virus", "bacteria"
 
-    wells = relationship("Well", back_populates="specimen")
-    # Might need to add barcode# 
 
+    well = relationship("Well", back_populates="specimen")
+    
+    
     __mapper_args__ = {
         'polymorphic_identity': 'specimen',
         'polymorphic_on': type
     }
 
     def __repr__(self):
-        # Generic representation that works for all specimen types
-        return f"<Specimen(id={self.id}, type={self.type})>"
+        return f"<Specimen(id={self.id}, type='{self.type}')>"
 
 
-class CellSpecimen(Specimen):
-    __tablename__ = "cell_specimens"  # Consistent naming
+class HumanDonor(Specimen):
+    __tablename__ = "human_donor"
     id = Column(Integer, ForeignKey("specimens.id"), primary_key=True)
-    name = Column(String, unique=True)  # e.g., "PBMC", "Liver", "Neuron", "Unknown"
 
-    __mapper_args__ = {
-        'polymorphic_identity': 'cell',
-    }
-
-    def __repr__(self):
-        return f"<CellSpecimen(id={self.id}, name={self.name})>"
-
-
-class BacteriaSpecimen(Specimen):
-    __tablename__ = "bacteria_specimens"
-    id = Column(Integer, ForeignKey("specimens.id"), primary_key=True)
-    species = Column(String)
-
-    __mapper_args__ = {
-        "polymorphic_identity": "bacteria"
-    }
-
-    def __repr__(self):
-        return f"<BacteriaSpecimen(id={self.id}, species={self.species})>"
-
-
-class VirusSpecimen(Specimen):
-    __tablename__ = "virus_specimens"
-    id = Column(Integer, ForeignKey("specimens.id"), primary_key=True)
-    species = Column(String)
-
-    __mapper_args__ = {
-        "polymorphic_identity": "virus"
-    }
-
-    def __repr__(self):
-        return f"<VirusSpecimen(id={self.id}, species={self.species})>"
-
-
-class DonorType(Specimen):
-    __tablename__ = "donor_types"
-    id = Column(Integer, ForeignKey("specimens.id"), primary_key=True)
-    donor_category = Column(String, nullable=False)  # "human", "mouse", etc.
-
-    # Relationship to CellSpecimen (a donor type can have multiple cell specimens)
-    cell_type_id = Column(Integer, ForeignKey("cell_specimens.id"), nullable=False)
-    cell_type = relationship("CellSpecimen", back_populates="donor_types")
-    
-    __mapper_args__ = {
-        'polymorphic_identity': 'donor' # it was donor_type
-    }
-
-class HumanDonor(DonorType):
-    __tablename__ = "human_donors"
-    id = Column(Integer, ForeignKey("donor_types.id"), primary_key=True)
-    name = Column(String)
+    human_name = Column(String(100), nullable=False)
+    cell_type_id = Column(Integer, ForeignKey("cell_type.id"), nullable=False)
+    cell_characteristic_id = Column(Integer, ForeignKey("cell_characteristics.id"), nullable=False)
     age = Column(Integer)
-    gender = Column(String)
-    # Other human-specific fields
-    
-    __mapper_args__ = {
-        "polymorphic_identity": "human"
-    }
+    sex = Column(String(1))
 
-class MouseDonor(DonorType):
-    __tablename__ = "mouse_donors"
-    id = Column(Integer, ForeignKey("donor_types.id"), primary_key=True)
-    strain = Column(String)
-    age_weeks = Column(Integer)
-    # Other mouse-specific fields
-    
+    # Relationships
+    cell_type = relationship("CellType")
+    cell_characteristic = relationship("CellCharacteristics")
+
     __mapper_args__ = {
-        "polymorphic_identity": "mouse"
+        'polymorphic_identity': 'human',
     }
 
 
+class MouseDonor(Specimen):
+    __tablename__ = "mouse_donor"
+    id = Column(Integer, ForeignKey("specimens.id"), primary_key=True)
+
+    name = Column(String(100), nullable=False)
+    cell_type_id = Column(Integer, ForeignKey("cell_type.id"), nullable=False)
+    cell_characteristic_id = Column(Integer, ForeignKey("cell_characteristics.id"), nullable=False)
+    strain = Column(String(50))
+    transgene = Column(String(50))
+
+    # Relationships
+    cell_type = relationship("CellType")
+    cell_characteristic = relationship("CellCharacteristics")
+    #wells = relationship("Well", back_populates="specimen")
+
+    __mapper_args__ = {
+        'polymorphic_identity': 'mouse',
+    }
 
 
+class Virus(Specimen):
+    __tablename__ = "virus"
+    id = Column(Integer, ForeignKey("specimens.id"), primary_key=True)
+    virus_name = Column(String(100), nullable=False)
+    virus_type = Column(String(50))  # "DNA", "RNA"
+
+    __mapper_args__ = {
+        'polymorphic_identity': 'virus'
+    }
 
 
+class Bacteria(Specimen):
+    __tablename__ = "bacteria"
+    id = Column(Integer, ForeignKey("specimens.id"), primary_key=True)
+    bacteria_name = Column(String(100), nullable=False)
+    bacteria_type = Column(String(50))  # "gram+", "gram-"
+
+    __mapper_args__ = {
+        'polymorphic_identity': 'bacteria'
+    }
 
 
+class CellType(Base):
+    __tablename__ = "cell_type"
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    cell_type_name = Column(String(50), nullable=False, unique=True)  # "PBMC", "liver", "neurons"
+
+
+class CellCharacteristics(Base):  # fixed spelling
+    __tablename__ = "cell_characteristics"
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    characteristic_name = Column(String(100), nullable=False, unique=True)  # "CD4+", "CD8+", etc.

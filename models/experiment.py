@@ -4,6 +4,10 @@ from sqlalchemy.ext.orderinglist import ordering_list
 from database import Base
 
 class Substance(Base):
+    '''
+    Substance contains chemical information about a substance that can be
+    used in Treatments.
+    '''
     __tablename__ = 'substances'
     id = Column(Integer, primary_key=True)
     name = Column(String, nullable=False)
@@ -14,6 +18,11 @@ class Substance(Base):
     treatments = relationship("Treatment", back_populates="substance")
 
 class ConditionClass(Base):
+    '''
+    A collection of conditions.
+    Main reason for this type is to enable to query well experiments by
+    conditionclass names, e.g. 'sample_prim01_activ01'
+    '''
     __tablename__ = 'conditionclasses'
     id = Column(Integer, primary_key=True)
     name = Column(String(30), nullable=False)
@@ -21,6 +30,11 @@ class ConditionClass(Base):
     conditions = relationship("Condition", back_populates="conditionclass")
 
 class Condition(Base):
+    '''
+    A Condition is an ordered sequence of treatments.
+    The order of treatments is defined in ConditionTreatmentCross.
+    The Condition table assigns each Condition to a Conditionclass.
+    '''
     __tablename__ = 'conditions'
     id = Column(Integer, primary_key=True)
     conditionclass_id = Column(Integer, ForeignKey('conditionclasses.id'), nullable=False)
@@ -31,6 +45,22 @@ class Condition(Base):
     experiments = relationship("Experiment", back_populates="condition")
 
 class Treatment(Base):
+    '''
+    A Treatment is an element of a Condition (the Condition is an ordered
+    sequence of treatments).
+    It contains information which substance is applied, at which concentration
+    and how long it was incubated.
+
+    Treatment.position specifies the order within the associcated Condition.
+    The position is automatically set when Treatment is initialized
+    as follows:
+
+    >>t1 = Treatment(..)
+    >>t2 = Treatment(..)
+    >>cond = Condition()
+    >>cond.ordered_treatments.append(t1) # position=0
+    >>cond.ordered_treatments.append(t2) # position=1
+    '''
     __tablename__ = 'treatments'
     id = Column(Integer, primary_key=True)
     type = Column(String(25), nullable=False)
@@ -44,6 +74,12 @@ class Treatment(Base):
     condition = relationship("Condition", back_populates="treatments")
 
 class Experiment(Base):
+    '''
+    An Experiment is a certain state of a Well. An Experiment includes
+    a Well, a Condition (a sequence of Treatments) of that well
+    and a Measurement. Experiments will be associated with experiment_results
+    in the future.
+    '''
     __tablename__ = 'experiments'
     id = Column(Integer, primary_key=True)
     well_id = Column(Integer, ForeignKey('wells.id'), nullable=False)
