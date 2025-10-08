@@ -1,5 +1,5 @@
 from sqlalchemy import column
-from models import Well
+from models import Well, specimen
 import re
 
 
@@ -40,22 +40,29 @@ def _parse_wellkey(well_key: str):
 
 
 
-def import_well(session, plate, well_key, donor, screen=None):
+def import_well(session, plate, well_key, specimen, screen=None):
     """Get or create a Well, reusing parsing logic from create_well."""
     row, col, normalized_well_key = _parse_wellkey(well_key)  # parse to use in query
 
     well = session.query(Well).filter_by(
-        well_key=well_key,
+        well_key=normalized_well_key,
         col=col,
         row=row,
-        plate=plate
+        plate=plate,
+        specimen=specimen
     ).first()
 
     if not well:
-        well = Well(well_key=normalized_well_key, col=col, row=row, plate=plate, donor=donor) 
+        well = Well(
+            well_key=normalized_well_key, 
+            col=col, 
+            row=row, 
+            plate=plate, 
+            specimen=specimen 
+            ) 
         session.add(well)
         session.flush()
-    elif well.donor is None:
-        well.donor = donor
+    elif well.specimen is None:
+        well.specimen = specimen
 
     return well

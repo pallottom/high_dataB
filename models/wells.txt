@@ -19,7 +19,4 @@ class Well(Base):
 
     plate = relationship("Plate", back_populates="wells")
     experiments = relationship("Experiment", back_populates="well")
-    specimen = relationship("Specimen", back_populates="well") 
-
-    def __repr__(self):
-        return f"<Well(id={self.id}, well_name='{self.well_name}')>"
+    specimen = relationship("Specimen", back_populates="wells") 

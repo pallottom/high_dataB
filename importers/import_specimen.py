@@ -1,36 +1,79 @@
-from models import SpecimenType, DonorType, CellType, HumanDonor
+from models import Specimen, HumanDonor, MouseDonor, CellType, CellCharacteristics 
+from sqlalchemy.orm import Session
 
-def import_specimen(session, donor_id, row):
-    specimen_type = session.query(SpecimenType).filter_by(name="cell").first()
-    if not specimen_type:
-        specimen_type = SpecimenType(name="cell")
-        session.add(specimen_type)
 
-    donor_type = session.query(DonorType).filter_by(name="human").first()
-    if not donor_type:
-        donor_type = DonorType(name="human")
-        session.add(donor_type)
+def import_specimen(session: Session, row: dict):
+    """
+    Import or retrieve a specimen (human or mouse donor) from a CSV row.
+    Uses single-table inheritance through Specimen base.
+    """
 
-    cell_type = session.query(CellType).filter_by(name="PBMC").first()
+    # --- Determine donor type ---
+    donor_type = row.get("donor_type", "human").lower().strip()  # fallback to human
+    donor_name = row.get("donor_loc") or "Unknown"
+
+    # --- Cell type and characteristics ---
+    cell_type_name = row.get("cell_type", "PBMC") # PBMC, Liver, Neuron, etc.
+    cell_char_name = row.get("cell_characteristic", "Primary") # Primary, Culture, Mixed
+
+    # Get or create cell type
+    cell_type = (
+        session.query(CellType)
+        .filter_by(cell_type_name=cell_type_name)
+        .first()
+    )
     if not cell_type:
-        cell_type = CellType(name="PBMC", specimen_type=specimen_type, donor_type=donor_type)
+        cell_type = CellType(cell_type_name=cell_type_name)
         session.add(cell_type)
-
-    human_donor = session.query(HumanDonor).filter_by(name=str(donor_id)).first()
-    if not human_donor:
-        human_donor = HumanDonor(
-            name=str(donor_id),
-            age=row.get("age"),
-            sex=row.get("sex"),
-            weight_kg=row.get("weight_kg"),
-            height_cm=row.get("height_cm"),
-            bmi=row.get("bmi"),
-            class_bmi=row.get("Class_BMI"),
-            class_weight=row.get("Class_weight"),
-            ethnicity=row.get("ethicity"),
-            donor_class=row.get("Class"),
-            cell_type=cell_type,
-        )
-        session.add(human_donor)
         session.flush()
-    return human_donor
+
+    # Get or create cell characteristic
+    cell_char = (
+        session.query(CellCharacteristics)
+        .filter_by(characteristic_name=cell_char_name)
+        .first()
+    )
+    if not cell_char:
+        cell_char = CellCharacteristics(characteristic_name=cell_char_name)
+        session.add(cell_char)
+        session.flush()
+
+    # --- Create or retrieve specimen ---
+    if donor_type == "human":
+        specimen = (
+            session.query(HumanDonor)
+            .filter_by(human_name=donor_name)
+            .first()
+        )
+        if not specimen:
+            specimen = HumanDonor(
+                human_name=donor_name,
+                age=row.get("age"),
+                sex=row.get("sex"),
+                cell_type=cell_type,
+                cell_characteristic=cell_char,
+            )
+            session.add(specimen)
+            session.flush()
+
+    elif donor_type == "mouse":
+        specimen = (
+            session.query(MouseDonor)
+            .filter_by(name=donor_name)
+            .first()
+        )
+        if not specimen:
+            specimen = MouseDonor(
+                name=donor_name,
+                strain=row.get("strain", "C57BL/6"),
+                transgene=row.get("transgene"),
+                cell_type=cell_type,
+                cell_characteristic=cell_char,
+            )
+            session.add(specimen)
+            session.flush()
+
+    else:
+        raise ValueError(f"Unknown donor_type: {donor_type}")
+
+    return specimen

@@ -1,127 +1,96 @@
-from sqlalchemy import Integer, String, Float, Column, ForeignKey
+from sqlalchemy import Integer, String, Column, ForeignKey, Sequence
 from sqlalchemy.orm import relationship
 from database import Base
 
+# Shared sequence for unique IDs across all specimen types
+specimen_id_seq = Sequence('specimen_id_seq', start=1)
 
-class SpecimenType(Base):
-    __tablename__ = "specimen_types"
-    id = Column(Integer, primary_key=True, autoincrement=True)
-    name = Column(String, nullable=False, unique=True)  # "cell", "bacteria", "virus"
+class Specimen(Base):
+    __tablename__ = "specimens"  # Must be a real table for inheritance
+    id = Column(Integer, specimen_id_seq, primary_key=True, server_default=specimen_id_seq.next_value())
+    type = Column(String(50), nullable=False)  # "human", "mouse", "virus", "bacteria"
 
-    donors = relationship("Donor", back_populates="specimen_type")
 
-    def __repr__(self):
-        return f"<SpecimenType(id={self.id}, name={self.name})>"
-
-class DonorType(Base):
-    __tablename__ = "donor_types"
-    id = Column(Integer, primary_key=True, autoincrement=True)
-    name = Column(String, nullable=False, unique=True)  # "human", "mouse"
-
-    cell_types = relationship("CellType", back_populates="donor_type")
-
-    def __repr__(self):
-        return f"<DonorType(id={self.id}, name={self.name})>"
-
-class CellType(Base):
-    __tablename__ = "cell_types"
-    id = Column(Integer, primary_key=True, autoincrement=True)
-    name = Column(String, nullable=False)  # "PBMC", "liver", etc.
-
-    specimen_type_id = Column(Integer, ForeignKey("specimen_types.id"))
-    donor_type_id = Column(Integer, ForeignKey("donor_types.id"))
-
-    specimen_type = relationship("SpecimenType")
-    donor_type = relationship("DonorType", back_populates="cell_types")
-    human_donors = relationship("HumanDonor", back_populates="cell_type")
-
-    def __repr__(self):
-        return f"<CellType(id={self.id}, name={self.name})>"
-
-# --- Polymorphic donor hierarchy ---
-
-class Donor(Base):
-    __tablename__ = 'donors'
-    id = Column(Integer, primary_key=True)
-    type = Column(String(50))  # 'human', 'bacteria', 'virus'
-
-    specimen_type_id = Column(Integer, ForeignKey("specimen_types.id"))
-    specimen_type = relationship("SpecimenType", back_populates="donors")
-
-    # 1-to-1 with Well
-    well = relationship("Well", back_populates="donor")
-
+    well = relationship("Well", back_populates="specimen")
+    
+    
     __mapper_args__ = {
-        'polymorphic_identity': 'donor',
+        'polymorphic_identity': 'specimen',
         'polymorphic_on': type
     }
 
     def __repr__(self):
-        return f"<Donor(id={self.id}, type={self.type})>"
+        return f"<Specimen(id={self.id}, type='{self.type}')>"
 
-class HumanDonor(Donor):
-    __tablename__ = 'human_donors'
-    id = Column(Integer, ForeignKey('donors.id'), primary_key=True)
 
-    # Donor metadata
-    name = Column(String, nullable=False)
-    sex = Column(String)
+class HumanDonor(Specimen):
+    __tablename__ = "human_donor"
+    id = Column(Integer, ForeignKey("specimens.id"), primary_key=True)
+
+    human_name = Column(String(100), nullable=False)
+    cell_type_id = Column(Integer, ForeignKey("cell_type.id"), nullable=False)
+    cell_characteristic_id = Column(Integer, ForeignKey("cell_characteristics.id"), nullable=False)
     age = Column(Integer)
-    weight_kg = Column(Float)
-    height_cm = Column(Float)
-    bmi = Column(Float)
-    smoker = Column(String)
-    ethnicity = Column(String)
-    donor_loc = Column(String)
-    age_group = Column(String)
-    class_bmi = Column(String)
-    class_weight = Column(String)
-    donor_class = Column(String)  
+    sex = Column(String(1))
 
-    # Link to CellType, which connects further to DonorType + SpecimenType
-    cell_type_id = Column(Integer, ForeignKey("cell_types.id"))
-    cell_type = relationship("CellType", back_populates="human_donors")
+    # Relationships
+    cell_type = relationship("CellType")
+    cell_characteristic = relationship("CellCharacteristics")
 
     __mapper_args__ = {
-        'polymorphic_identity': 'human'
+        'polymorphic_identity': 'human',
     }
 
-    def __repr__(self):
-        return f"<HumanDonor(id={self.id}, name={self.name}, cell_type={self.cell_type.name if self.cell_type else None})>"
 
-class BacteriaDonor(Donor):
-    __tablename__ = 'bacteria_donors'
-    id = Column(Integer, ForeignKey('donors.id'), primary_key=True)
-    bacteria_type_id = Column(Integer, ForeignKey("bacteria_types.id"))
+class MouseDonor(Specimen):
+    __tablename__ = "mouse_donor"
+    id = Column(Integer, ForeignKey("specimens.id"), primary_key=True)
 
-    bacteria_type = relationship("BacteriaType")
+    name = Column(String(100), nullable=False)
+    cell_type_id = Column(Integer, ForeignKey("cell_type.id"), nullable=False)
+    cell_characteristic_id = Column(Integer, ForeignKey("cell_characteristics.id"), nullable=False)
+    strain = Column(String(50))
+    transgene = Column(String(50))
+
+    # Relationships
+    cell_type = relationship("CellType")
+    cell_characteristic = relationship("CellCharacteristics")
+    #wells = relationship("Well", back_populates="specimen")
 
     __mapper_args__ = {
-        'polymorphic_identity': 'bacteria'
+        'polymorphic_identity': 'mouse',
     }
 
-class VirusDonor(Donor):
-    __tablename__ = 'virus_donors'
-    id = Column(Integer, ForeignKey('donors.id'), primary_key=True)
-    virus_type_id = Column(Integer, ForeignKey("virus_types.id"))
 
-    virus_type = relationship("VirusType")
+class Virus(Specimen):
+    __tablename__ = "virus"
+    id = Column(Integer, ForeignKey("specimens.id"), primary_key=True)
+    virus_name = Column(String(100), nullable=False)
+    virus_type = Column(String(50))  # "DNA", "RNA"
 
     __mapper_args__ = {
         'polymorphic_identity': 'virus'
     }
 
-# --- Concrete types for bacteria/virus ---
-class BacteriaType(Base):
-    __tablename__ = "bacteria_types"
-    id = Column(Integer, primary_key=True, autoincrement=True)
-    name = Column(String, nullable=False)
-    specimen_type_id = Column(Integer, ForeignKey("specimen_types.id"))
-    specimen_type = relationship("SpecimenType")
 
-class VirusType(Base):
-    __tablename__ = "virus_types"
+class Bacteria(Specimen):
+    __tablename__ = "bacteria"
+    id = Column(Integer, ForeignKey("specimens.id"), primary_key=True)
+    bacteria_name = Column(String(100), nullable=False)
+    bacteria_type = Column(String(50))  # "gram+", "gram-"
+
+    __mapper_args__ = {
+        'polymorphic_identity': 'bacteria'
+    }
+
+
+class CellType(Base):
+    __tablename__ = "cell_type"
     id = Column(Integer, primary_key=True, autoincrement=True)
-    name = Column(String, nullable=False)
-    specimen_type_id = Column(Integer, ForeignKey("specimen_types.id"))
-    specimen_type = relationship("SpecimenType")
+    cell_type_name = Column(String(50), nullable=False, unique=True)  # "PBMC", "liver", "neurons"
+
+
+class CellCharacteristics(Base):  # fixed spelling
+    __tablename__ = "cell_characteristics"
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    characteristic_name = Column(String(100), nullable=False, unique=True)  # "CD4+", "CD8+", etc.

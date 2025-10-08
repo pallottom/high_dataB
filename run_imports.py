@@ -61,12 +61,12 @@ def run_import(csv_file):
 
     default_measurement = import_measurement.get_or_create_default_measurement(session)
 
-    for _, row in df.head(50).iterrows():
+    for _, row in df.head(150).iterrows():
         donor_id = row["donor_ID"]
         experiment_barcode = row["barcode"]
         plate_barcode = row["plate"]
         well_key = row["wellname"]
-        project_num= _parse_barcode(experiment_barcode)
+        #project_num= _parse_barcode(experiment_barcode)
 
         prefix, project_num, screen_number, run_num, plate_num = _parse_barcode(experiment_barcode)
 
@@ -77,7 +77,7 @@ def run_import(csv_file):
         plate = import_management.import_plate(session, screen, row["plate"], plate_barcode, row["date_exp"], project)
 
         # Specimen
-        human_donor = import_specimen.import_specimen(session, donor_id, row)
+        human_donor = import_specimen.import_specimen(session, row)
 
         # Well
 
