@@ -7,13 +7,6 @@ import re
 from database import SessionLocal
 
 
-"""
-engine = create_engine("postgresql+psycopg2://postgres:postgres@localhost:5432/test_marta_5", echo=True)
-Session = sessionmaker(bind=engine)
-
-"""
-
-
 
 def _parse_barcode(barcode):
     """
@@ -64,9 +57,11 @@ def run_import(csv_file):
     for _, row in df.head(150).iterrows():
         donor_id = row["donor_ID"]
         experiment_barcode = row["barcode"]
-        plate_barcode = row["plate"]
+        plate_barcode = row["barcode"]
         well_key = row["wellname"]
+        date_exp = row.get("date_exp", "unknown_date")
         #project_num= _parse_barcode(experiment_barcode)
+
 
         prefix, project_num, screen_number, run_num, plate_num = _parse_barcode(experiment_barcode)
 
@@ -74,7 +69,7 @@ def run_import(csv_file):
         # Management
         project = import_management.import_project(session, "Group name to be added")
         screen = import_management.import_screen(session, project, screen_number, experiment_barcode, "Experiment description")
-        plate = import_management.import_plate(session, screen, row["plate"], plate_barcode, row["date_exp"], project)
+        plate = import_management.import_plate(session, screen, plate_num, plate_barcode, date_exp, project)
 
         # Specimen
         human_donor = import_specimen.import_specimen(session, row)
@@ -90,7 +85,7 @@ def run_import(csv_file):
     session.close()
 
 if __name__ == "__main__":
-    run_import("C:/Users/pallottom/Documents/Projects/screendb/screendb/test_data/metadata_import/IMXPR04S02_E01_wellinfo_20201202.csv")
+    run_import("../test_DB/data/IMXPR05S07R04R05_wi_htrf_icc_20250917_JB.csv")
 
     print("✅ Data loading completed")
 
@@ -100,3 +95,10 @@ if __name__ == "__main__":
 
 
     """ ../test_DB/data/IMXPR04_postATP_ready4FeatureVector_JB_20220224 (copy).csv """
+
+
+
+"""../test_DB/data/IMXPR03S14R02R05_wi_htrf_asc_20251003_JB(in).csv""" # Mouse data
+
+"""../test_DB/data/GVS_20250822_extendedfeatures.csv""" # New Human data 
+"""../test_DB/data/IMXPR05S07R04R05_wi_htrf_icc_20250917_JB.csv""" # New Human data 

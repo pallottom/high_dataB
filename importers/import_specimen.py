@@ -9,7 +9,7 @@ def import_specimen(session: Session, row: dict):
     """
 
     # --- Determine donor type ---
-    donor_type = row.get("donor_type", "human").lower().strip()  # fallback to human
+    donor_type = row.get("donor_species", "human").lower().strip()  # fallback to human
     donor_name = row.get("donor_loc") or "Unknown"
 
     # --- Cell type and characteristics ---
@@ -64,7 +64,7 @@ def import_specimen(session: Session, row: dict):
         )
         if not specimen:
             specimen = MouseDonor(
-                name=donor_name,
+                name=row.get("donor_ID", "unknown"),#donor_name,
                 strain=row.get("strain", "C57BL/6"),
                 transgene=row.get("transgene"),
                 cell_type=cell_type,
