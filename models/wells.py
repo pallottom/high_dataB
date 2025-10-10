@@ -12,13 +12,14 @@ class Well(Base):
     well_key = Column(String(3), nullable=False)
     row = Column(Integer, nullable=False)
     col = Column(Integer, nullable=False)
+    #experiment_id = Column(Integer, ForeignKey('experiments.id'))
 
     plate_id = Column(Integer, ForeignKey('plates.id'))
     specimen_id = Column(Integer, ForeignKey('specimens.id'))
 
 
     plate = relationship("Plate", back_populates="wells")
-    experiments = relationship("Experiment", back_populates="well")
+    experiments = relationship("Experiment", back_populates="wells")
     specimen = relationship("Specimen", back_populates="well") 
 
     def __repr__(self):

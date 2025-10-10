@@ -17,7 +17,7 @@ def import_condition_class(session, name, description=None):
 
 def import_condition(session, condition_class):
     """Get or create a Condition for a given ConditionClass."""
-    condition = session.query(Condition).filter_by(conditionclass=condition_class).first()
+    condition = session.query(Condition).filter_by(conditionclass_id=condition_class.id).first()
     if not condition:
         condition = Condition(conditionclass=condition_class)
         session.add(condition)
@@ -49,16 +49,16 @@ def import_treatment(session, condition, position, treatment_type,
     if not substance:
         return None
 
-    duration_str = f"{duration_min} minutes"
+    duration_str = f"{duration_min} minutes"  ## Option to add datetime# 
 
-    existing = session.query(Treatment).filter_by(
-        type=treatment_type,
-        substance=substance,
-        concentration=concentration,
-        concentration_unit=concentration_unit,
-        duration=duration_str,
-        condition=condition,
-        position=position
+    existing = session.query(Treatment).filter(  # was filter_by
+        Treatment.type == treatment_type,
+        Treatment.substance_id == substance.id,
+        Treatment.concentration == concentration,
+        Treatment.concentration_unit == concentration_unit,
+        Treatment.duration == duration_str,
+        Treatment.condition_id == condition.id,  # Changed from 'condition' to 'condition_id'
+        Treatment.position == position
     ).first()
 
     if existing:
@@ -66,11 +66,11 @@ def import_treatment(session, condition, position, treatment_type,
 
     treatment = Treatment(
         type=treatment_type,
-        substance=substance,
+        substance_id=substance.id,
         concentration=concentration,
         concentration_unit=concentration_unit,
         duration=duration_str,
-        condition=condition,
+        condition_id=condition.id,
         position=position
     )
     session.add(treatment)
@@ -119,16 +119,20 @@ def import_experiment(session, row, well, measurement):
         )
 
     # --- Experiment ---
-    experiment = session.query(Experiment).filter_by(well=well, condition=condition).first()
+    experiment = session.query(Experiment).filter_by(
+        well_id=well.id, 
+        condition_id=condition.id
+        ).first()
+    
     if not experiment:
         htrf_data_il1b = row.get("htrf_il1b_data")
         htrf_data_tnfa = row.get("htrf_tnfa_data")
         qc_status = "pass" if (pd.notna(htrf_data_il1b) or pd.notna(htrf_data_tnfa)) else "fail"
 
         experiment = Experiment(
-            well=well,
-            condition=condition,
-            measurement=measurement,
+            well_id=well.id,
+            condition_id=condition.id,
+            measurement_id=measurement.id,
             qc=qc_status
         )
         session.add(experiment)
