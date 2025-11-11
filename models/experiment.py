@@ -100,9 +100,9 @@ class Experiment(Base):
     __tablename__ = 'experiments'
     id = Column(Integer, primary_key=True)
     well_id = Column(Integer, ForeignKey('wells.id'), unique=True, nullable=False)
-    measurement_id = Column(Integer, ForeignKey('measurements.id'), nullable=False)
+    #measurement_id = Column(Integer, ForeignKey('measurements.id'), nullable=False)
     condition_id = Column(Integer, ForeignKey('conditions.id'))
     qc = Column(String(4), nullable=False, default='pass')
     wells = relationship("Well", back_populates="experiments", uselist=False) # uselist is a 1-1 constraint
-    measurement = relationship("Measurement", back_populates="experiments")
+    #measurement = relationship("Measurement", back_populates="experiments")
     condition = relationship("Condition", back_populates="experiments")

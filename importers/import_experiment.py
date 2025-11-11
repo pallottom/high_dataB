@@ -132,7 +132,7 @@ def import_experiment(session, row, well, measurement):
         experiment = Experiment(
             well_id=well.id,
             condition_id=condition.id,
-            measurement_id=measurement.id,
+            #measurement_id=measurement.id,
             qc=qc_status
         )
         session.add(experiment)

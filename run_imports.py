@@ -52,7 +52,7 @@ def run_import(csv_file):
     df = pd.read_csv(csv_file)
     session = SessionLocal()
 
-    default_measurement = import_measurement.get_or_create_default_measurement(session)
+    #default_measurement = import_measurement.get_or_create_default_measurement(session)
 
     for _, row in df.head(150).iterrows():
         donor_id = row["donor_ID"]
@@ -72,20 +72,22 @@ def run_import(csv_file):
         plate = import_management.import_plate(session, screen, plate_num, plate_barcode, date_exp, project)
 
         # Specimen
-        human_donor = import_specimen.import_specimen(session, row)
+        human_donor = import_specimen.import_specimen(session, row) # Think to change into specimen = import_specimen.import_specimen(session, row) 
 
         # Well
-
         well = import_wells.import_well(session, plate, well_key, human_donor, screen=screen)
 
+        # Measurement branch (now linked to well)
+        measurement = import_measurement.get_or_create_default_measurement(session, well)
+
         # Experiments
-        import_experiment.import_experiment(session, row, well, default_measurement)
+        import_experiment.import_experiment(session, row, well, measurement)#default_measurement)
 
     session.commit()
     session.close()
 
 if __name__ == "__main__":
-    run_import("../test_DB/data/IMXPR05S07R04R05_wi_htrf_icc_20250917_JB.csv")
+    run_import(r"/Users/pallottom/Documents/Projects/test_DB/data/IMXPR04_postATP_20220224_extendedfeatures(copy).csv")
 
     print("✅ Data loading completed")
 
