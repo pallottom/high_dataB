@@ -5,6 +5,7 @@ from models import *
 from importers import import_management, import_specimen, import_measurement, import_wells, import_experiment
 import re
 from database import SessionLocal
+import os
 
 
 
@@ -86,21 +87,25 @@ def run_import(csv_file):
     session.commit()
     session.close()
 
+
+
+
+
+BASE_PATH = r"/Users/pallottom/Documents/Projects/test_DB/data/"
+FILES_CSV = r"/Users/pallottom\Documents/Projects/hi_dataB/ingestion_files.csv"
+
 if __name__ == "__main__":
-    run_import(r"/Users/pallottom/Documents/Projects/test_DB/data/IMXPR04_postATP_20220224_extendedfeatures(copy).csv")
+    df = pd.read_csv(FILES_CSV)
+
+    for filename in df["File_name"]:
+        full_path = os.path.join(BASE_PATH, filename)
+        run_import(full_path)
 
     print("✅ Data loading completed")
 
 
-
-    """ "C:/Users/pallottom/Documents/Projects/screendb/screendb/test_data/metadata_import/IMXPR04S02_E01_wellinfo_20201202.csv" """
-
-
-    """ ../test_DB/data/IMXPR04_postATP_ready4FeatureVector_JB_20220224 (copy).csv """
-
-
-
-"""../test_DB/data/IMXPR03S14R02R05_wi_htrf_asc_20251003_JB(in).csv""" # Mouse data
-
-"""../test_DB/data/GVS_20250822_extendedfeatures.csv""" # New Human data 
-"""../test_DB/data/IMXPR05S07R04R05_wi_htrf_icc_20250917_JB.csv""" # New Human data 
+#""" "C:/Users/pallottom/Documents/Projects/screendb/screendb/test_data/metadata_import/IMXPR04S02_E01_wellinfo_20201202.csv" """
+#""" ../test_DB/data/IMXPR04_postATP_ready4FeatureVector_JB_20220224 (copy).csv """
+#"""../test_DB/data/IMXPR03S14R02R05_wi_htrf_asc_20251003_JB(in).csv""" # Mouse data
+#"""../test_DB/data/GVS_20250822_extendedfeatures.csv""" # New Human data 
+#"""../test_DB/data/IMXPR05S07R04R05_wi_htrf_icc_20250917_JB.csv""" # New Human data 
