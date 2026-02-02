@@ -23,7 +23,7 @@ class Well(Base):
     plate = relationship("Plate", back_populates="wells")
     experiments = relationship("Experiment", back_populates="wells")
     specimen = relationship("Specimen", back_populates="well") 
-    measurements = relationship("Measurement", back_populates="well")
+    measurements = relationship("Measurement", back_populates="wells")
 
 
     #def __repr__(self):
