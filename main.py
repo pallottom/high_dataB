@@ -17,12 +17,12 @@ if __name__ == "__main__":
 
     """
 
-import yaml
+import toml
 from pprint import pprint
 
 
 with open("config.toml", "r") as file:
-    config: dict = yaml.safe_load(file)
+    config: dict = toml.load(file)
 
 
 pprint(config)
