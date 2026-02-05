@@ -1,0 +1,68 @@
+# Config file for hi_dataB
+# Environment: development, tests, operational
+# Select environment via ENVIRONMENT env var (defaults to development)
+
+[info]
+name = "hi_dataB"
+version = "1.0.0"
+
+# DEVELOPMENT ENVIRONMENT
+[development]
+debug = true
+log_level = "DEBUG"
+
+[development.database]
+type = "postgresql"
+host = "localhost"
+port = 5432
+name = "hi_dataB_dev"
+user = "postgres"
+password = "postgres"
+
+[development.engine]
+echo = true
+pool_size = 5
+max_overflow = 10
+pool_timeout = 30
+pool_pre_ping = true
+
+# TESTS ENVIRONMENT
+[tests]
+debug = true
+log_level = "INFO"
+
+[tests.database]
+type = "postgresql"
+host = "localhost"
+port = 5432
+name = "hi_dataB_test"
+user = "postgres"
+password = "postgres"
+
+[tests.engine]
+echo = false
+pool_size = 3
+max_overflow = 5
+pool_timeout = 30
+pool_pre_ping = true
+
+# OPERATIONAL ENVIRONMENT
+[operational]
+debug = false
+log_level = "WARNING"
+
+[operational.database]
+type = "postgresql"
+host = "prod-server.example.com"
+port = 5432
+name = "hi_dataB_prod"
+user = "prod_user"
+password = "prod_password"
+
+[operational.engine]
+echo = false
+pool_size = 20
+max_overflow = 30
+pool_timeout = 60
+pool_pre_ping = true
+
