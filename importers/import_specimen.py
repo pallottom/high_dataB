@@ -19,11 +19,11 @@ def import_specimen(session: Session, row: dict):
     # Get or create cell type
     cell_type = (
         session.query(CellType)
-        .filter_by(cell_type_name=cell_type_name)
+        .filter_by(name=cell_type_name)
         .first()
     )
     if not cell_type:
-        cell_type = CellType(cell_type_name=cell_type_name)
+        cell_type = CellType(name=cell_type_name)
         session.add(cell_type)
         session.flush()
 
@@ -42,12 +42,12 @@ def import_specimen(session: Session, row: dict):
     if donor_type == "human":
         specimen = (
             session.query(HumanDonor)
-            .filter_by(human_name=donor_name)
+            .filter_by(name=donor_name)
             .first()
         )
         if not specimen:
             specimen = HumanDonor(
-                human_name=donor_name,
+                name=donor_name,
                 age=row.get("age"),
                 sex=row.get("sex"),
                 cell_type=cell_type,
