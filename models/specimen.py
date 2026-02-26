@@ -27,7 +27,7 @@ class HumanDonor(Specimen):
     __tablename__ = "human_donor"
     id = Column(Integer, ForeignKey("specimens.id"), primary_key=True)
 
-    human_name = Column(String(100), nullable=False)
+    name = Column(String(100), nullable=False)
     cell_type_id = Column(Integer, ForeignKey("cell_type.id"), nullable=False)
     cell_characteristic_id = Column(Integer, ForeignKey("cell_characteristics.id"), nullable=False)
     age = Column(Integer)
@@ -87,7 +87,7 @@ class Bacteria(Specimen):
 class CellType(Base):
     __tablename__ = "cell_type"
     id = Column(Integer, primary_key=True, autoincrement=True)
-    cell_type_name = Column(String(50), nullable=False, unique=True)  # "PBMC", "liver", "neurons"
+    name = Column(String(50), nullable=False, unique=True)  # "PBMC", "liver", "neurons"
 
 
 class CellCharacteristics(Base):  # fixed spelling
