@@ -3,3 +3,4 @@ SQLAlchemy
 sqlalchemy-utils
 dotenv
 toml
+pytest
