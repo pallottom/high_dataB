@@ -90,7 +90,7 @@ class Enzymatic(Homogeneous):
 #### IMAGE_BASED CHILD CLASSES #####
 
 class Nuc(ImageBased):
-    __tablename__ = "Nuc"
+    __tablename__ = "nuc"
     id = Column(Integer, ForeignKey("image_based.id"), primary_key=True)
 
     Cells_count = Column(Float, nullable=False)
@@ -107,10 +107,13 @@ class Tnfa(ImageBased):
     __tablename__ = "tnfa"
     id = Column(Integer, ForeignKey("image_based.id"), primary_key=True)
 
-    TNFaPosCells_count= Column(Float, nullable=False)
-    TNFaPosCells_AreaCOUNT = Column(Float, nullable=False)
-    TNFaPosCells_AreaTOT = Column(Float, nullable=False)
-    TNFaPosCells_AVG = Column(Float, nullable=False)
+    Em616 = Column(Float, nullable=True)
+    Em665 = Column(Float, nullable=True)
+    Count = Column(Float, nullable=True)
+    Area_Total = Column(Float, nullable=True)
+    Area_Avg = Column(Float, nullable=True)
+    Diameter_Total = Column(Float, nullable=True)
+    Diameter_Avg = Column(Float, nullable=True)
 
     # Relationships
 
@@ -122,6 +125,8 @@ class Il1b(ImageBased):
     __tablename__ = "il1b"
     id = Column(Integer, ForeignKey("image_based.id"), primary_key=True)
 
+    Em616 = Column(Float, nullable=True)
+    Em655 = Column(Float, nullable=True)
     IL1bPosCells_count= Column(Float, nullable=False)
     Il1bCircularity = Column(Float, nullable=False)
     Il1bDiameter = Column(Float, nullable=False)
