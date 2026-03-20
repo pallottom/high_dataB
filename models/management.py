@@ -25,7 +25,7 @@ class Screen(Base):
 class Plate(Base):
     __tablename__ = 'plates'
     id = Column(Integer, primary_key=True)
-    plate_name = Column(String, nullable=False)
+    name = Column(String, nullable=False)
     barcode = Column(String)
     date_experiment = Column(String)
     screen_id = Column(Integer, ForeignKey('screens.id'))
@@ -39,7 +39,8 @@ class Plate(Base):
 class Location(Base):
     __tablename__ = 'locations'
     id = Column(Integer, primary_key=True)
-    path = Column(String, nullable=False)
+    img_path = Column(String, nullable=False)
+    source_path = Column(String)
     barcode_id = Column(Integer, ForeignKey('plates.id'))
 
     plate = relationship("Plate", back_populates="locations")

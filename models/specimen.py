@@ -1,4 +1,4 @@
-from sqlalchemy import Integer, String, Column, ForeignKey, Sequence
+from sqlalchemy import Integer, String, Column, ForeignKey, Sequence, Float, Boolean
 from sqlalchemy.orm import relationship
 from database import Base
 
@@ -28,12 +28,19 @@ class HumanDonor(Specimen):
     id = Column(Integer, ForeignKey("specimens.id"), primary_key=True)
 
     name = Column(String(100), nullable=False)
+    weight_kg = Column(Float)
+    height_cm = Column(Float)
+    smoker = Column(Boolean)
+    ethnicity = Column(String(100))
+    blood_type = Column(String(10))
+    anticoagulant_id = Column(Integer, ForeignKey("anticoagulat.id"))
     cell_type_id = Column(Integer, ForeignKey("cell_type.id"), nullable=False)
     cell_characteristic_id = Column(Integer, ForeignKey("cell_characteristics.id"), nullable=False)
     age = Column(Integer)
     sex = Column(String(1))
 
     # Relationships
+    anticoagulat = relationship("Anticoagulat", back_populates="human_donors")
     cell_type = relationship("CellType")
     cell_characteristic = relationship("CellCharacteristics")
 
@@ -47,12 +54,14 @@ class MouseDonor(Specimen):
     id = Column(Integer, ForeignKey("specimens.id"), primary_key=True)
 
     name = Column(String(100), nullable=False)
+    anticoagulant_id = Column(Integer, ForeignKey("anticoagulat.id"))
     cell_type_id = Column(Integer, ForeignKey("cell_type.id"), nullable=False)
     cell_characteristic_id = Column(Integer, ForeignKey("cell_characteristics.id"), nullable=False)
     strain = Column(String(50))
     transgene = Column(String(50))
 
     # Relationships
+    anticoagulat = relationship("Anticoagulat", back_populates="mouse_donors")
     cell_type = relationship("CellType")
     cell_characteristic = relationship("CellCharacteristics")
     #wells = relationship("Well", back_populates="specimen")
@@ -65,8 +74,8 @@ class MouseDonor(Specimen):
 class Virus(Specimen):
     __tablename__ = "virus"
     id = Column(Integer, ForeignKey("specimens.id"), primary_key=True)
-    virus_name = Column(String(100), nullable=False)
-    virus_type = Column(String(50))  # "DNA", "RNA"
+    name = Column(String(100), nullable=False)
+    category_type = Column("type", String(50))  # "DNA", "RNA"
 
     __mapper_args__ = {
         'polymorphic_identity': 'virus'
@@ -76,12 +85,21 @@ class Virus(Specimen):
 class Bacteria(Specimen):
     __tablename__ = "bacteria"
     id = Column(Integer, ForeignKey("specimens.id"), primary_key=True)
-    bacteria_name = Column(String(100), nullable=False)
-    bacteria_type = Column(String(50))  # "gram+", "gram-"
+    name = Column(String(100), nullable=False)
+    category_type = Column("type", String(50))  # "gram+", "gram-"
 
     __mapper_args__ = {
         'polymorphic_identity': 'bacteria'
     }
+
+
+class Anticoagulat(Base):
+    __tablename__ = "anticoagulat"
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    anticoagulant_name = Column(String(100), nullable=False)
+
+    human_donors = relationship("HumanDonor", back_populates="anticoagulat")
+    mouse_donors = relationship("MouseDonor", back_populates="anticoagulat")
 
 
 class CellType(Base):
@@ -93,4 +111,4 @@ class CellType(Base):
 class CellCharacteristics(Base):  # fixed spelling
     __tablename__ = "cell_characteristics"
     id = Column(Integer, primary_key=True, autoincrement=True)
-    characteristic_name = Column(String(100), nullable=False, unique=True)  # "CD4+", "CD8+", etc.
+    name = Column("characteristic_name", String(100), nullable=False, unique=True)  # "CD4+", "CD8+", etc.

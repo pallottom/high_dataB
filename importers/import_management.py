@@ -1,4 +1,4 @@
-from models import Project, Screen, Plate
+from models import Project, Screen, Plate, Location
 
 def import_project(session, group_name):
     project = session.query(Project).filter_by(group_name=group_name).first()
@@ -23,19 +23,38 @@ def import_screen(session, project, screen_number, barcode, description):
     return screen
 
 
-def import_plate(session, screen, plate_name, barcode, date_experiment, project):
+def import_plate(session, screen, name, barcode, date_experiment, project):
     plate = session.query(Plate).filter_by(barcode=barcode).first()
     if plate:
         # Update the existing plate if it already exists
-        plate.plate_name = plate_name
+        plate.name = name
         plate.date_experiment = str(date_experiment)
         plate.screen = screen
         plate.project = project
 
     else:
         # Create a new plate if it doesn't exist
-        plate = Plate(plate_name=plate_name, barcode=barcode, date_experiment=str(date_experiment))
+        plate = Plate(name=name, barcode=barcode, date_experiment=str(date_experiment))
         screen.plates.append(plate)
         session.add(plate)
     session.commit()
     return plate
+
+
+def import_location(session, plate, img_path, source_path):
+    location = session.query(Location).filter_by(
+        barcode_id=plate.id,
+        img_path=img_path,
+        source_path=source_path,
+    ).first()
+
+    if not location:
+        location = Location(
+            img_path=img_path,
+            source_path=source_path,
+            plate=plate,
+        )
+        session.add(location)
+        session.commit()
+
+    return location
