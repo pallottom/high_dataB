@@ -1,3 +1,5 @@
-﻿,File_name,img_path
-1,IMXPR04_postATP_ready4FeatureVector_JB_20220224 (copy).csv,//server.dzne.de/path_to_img
-2,GVS_20250822_extendedfeatures.csv,//server.dzne.de/path_to_img
+﻿,File_name,img_path,specimen
+1,GVS_20250822_extendedfeatures.csv,//server.dzne.de/GVS_20250822_extendedfeatures.csv,
+2,IMXPR04_postATP_20220224_extendedfeatures.csv,//server.dzne.de/IMXPR04_postATP_20220224_extendedfeatures,
+3,IMXPR05S07R04R05_wi_htrf_icc_20250917_JB.csv,//server.dzne.de/IMXPR05S07R04R05_wi_htrf_icc_20250917_JB,mouse
+4,IMXPR04_postATP_ready4FeatureVector_JB_20220224 (copy).csv,//server.dzne.de/IMXPR04_postATP_ready4FeatureVector_JB_20220224,

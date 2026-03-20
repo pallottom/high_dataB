@@ -49,13 +49,16 @@ def _parse_barcode(barcode):
 
 
 
-def run_import(csv_file):
+def run_import(csv_file, img_path=None, source_path=None, specimen_type=None):
     df = pd.read_csv(csv_file)
     session = SessionLocal()
 
     #default_measurement = import_measurement.get_or_create_default_measurement(session)
 
-    for _, row in df.head(150).iterrows():
+    for _, row in df.iterrows(): #df.head(150).iterrows():  #df.iterrows()
+        row = row.copy()
+        if specimen_type is not None:
+            row["specimen"] = specimen_type
         donor_id = row["donor_ID"]
         experiment_barcode = row["barcode"]
         plate_barcode = row["barcode"]
@@ -71,15 +74,18 @@ def run_import(csv_file):
         project = import_management.import_project(session, "Group name to be added")
         screen = import_management.import_screen(session, project, screen_number, experiment_barcode, "Experiment description")
         plate = import_management.import_plate(session, screen, plate_num, plate_barcode, date_exp, project)
+        import_management.import_location(session, plate, img_path, source_path)
 
         # Specimen
-        human_donor = import_specimen.import_specimen(session, row) # Think to change into specimen = import_specimen.import_specimen(session, row) 
+        specimen = import_specimen.import_specimen(session, row) # Think to change into specimen = import_specimen.import_specimen(session, row) 
 
         # Well
-        well = import_wells.import_well(session, plate, well_key, human_donor, screen=screen)
+        well = import_wells.import_well(session, plate, well_key, specimen, screen=screen)
 
         # Measurement branch (now linked to well)
-        measurement = import_measurement.get_or_create_default_measurement(session, well)
+        measurement_row = row.to_dict()
+        measurement_row["__well"] = well
+        measurement = import_measurement.import_measurement(session, measurement_row)
 
         # Experiments
         import_experiment.import_experiment(session, row, well, measurement)#default_measurement)
@@ -97,9 +103,18 @@ FILES_CSV = r"/Users/pallottom\Documents/Projects/hi_dataB/ingestion_files.csv"
 if __name__ == "__main__":
     df = pd.read_csv(FILES_CSV)
 
-    for filename in df["File_name"]:
+    for _, ingestion_row in df.iterrows():
+        filename = ingestion_row.get("file_name")
+        if pd.isna(filename) or filename is None:
+            filename = ingestion_row.get("File_name")
+        img_path = ingestion_row.get("img_path")
+        if pd.isna(img_path):
+            img_path = ""
+        specimen_type = ingestion_row.get("specimen")
+        if pd.isna(specimen_type) or specimen_type is None:
+            specimen_type = "human"
         full_path = os.path.join(BASE_PATH, filename)
-        run_import(full_path)
+        run_import(full_path, img_path=str(img_path), source_path=str(filename), specimen_type=str(specimen_type).strip().lower())
 
     print("✅ Data loading completed")
 
