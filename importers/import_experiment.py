@@ -1,5 +1,49 @@
 from models import ConditionClass, Condition, Substance, Treatment, Experiment
 import pandas as pd
+import hashlib
+import json
+from pathlib import Path
+
+
+_PUBCHEM_HASH_BY_NAME = None
+
+
+def _normalize_substance_name(name):
+    return str(name).strip().lower()
+
+
+def _load_pubchem_hashes():
+    global _PUBCHEM_HASH_BY_NAME
+    if _PUBCHEM_HASH_BY_NAME is not None:
+        return _PUBCHEM_HASH_BY_NAME
+
+    pubchem_path = Path(__file__).resolve().parent.parent / "pubchem_data.json"
+    hash_by_name = {}
+    try:
+        with pubchem_path.open("r", encoding="utf-8") as f:
+            payload = json.load(f)
+        for item in payload.get("results", []):
+            common_name = item.get("common_name")
+            hash_sha256_8 = item.get("hash_sha256_8")
+            if not hash_sha256_8:
+                continue
+
+            hash_value = str(hash_sha256_8)
+
+            if common_name:
+                hash_by_name[_normalize_substance_name(common_name)] = hash_value
+
+            synonyms = item.get("depositor-supplied-synonyms") or []
+            if isinstance(synonyms, list):
+                for synonym in synonyms:
+                    if synonym and isinstance(synonym, str):
+                        # Keep first mapping for ambiguous synonyms shared by multiple compounds.
+                        hash_by_name.setdefault(_normalize_substance_name(synonym), hash_value)
+    except (OSError, ValueError, TypeError):
+        hash_by_name = {}
+
+    _PUBCHEM_HASH_BY_NAME = hash_by_name
+    return _PUBCHEM_HASH_BY_NAME
 
 
 def import_condition_class(session, name, description=None):
@@ -30,10 +74,21 @@ def import_substance(session, name, type="small_molecule", vendor="default_vendo
     if not name or not pd.notna(name):
         return None
 
-    substance = session.query(Substance).filter_by(name=str(name)).first()
+    name_str = str(name)
+    pubchem_hashes = _load_pubchem_hashes()
+    substance_hash = pubchem_hashes.get(_normalize_substance_name(name_str))
+
+    # Fallback keeps imports working when a name is not present in pubchem_data.json.
+    if not substance_hash:
+        substance_hash = hashlib.sha256(
+            f"{name_str}|{type}|{vendor}".encode("utf-8")
+        ).hexdigest()
+
+    substance = session.query(Substance).filter_by(hash=substance_hash).first()
     if not substance:
         substance = Substance(
-            name=str(name),
+            hash=substance_hash,
+            name=name_str,
             type=type,
             catalog_id=f"CAT_{name}",
             vendor=vendor,

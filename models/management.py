@@ -1,10 +1,11 @@
-from sqlalchemy import Column, Integer, String, ForeignKey
+from sqlalchemy import Column, Integer, String, ForeignKey, UniqueConstraint
 from sqlalchemy.orm import relationship
 from database import Base
 
 class Project(Base):
     __tablename__ = 'projects'
     id = Column(Integer, primary_key=True)
+    name = Column(String, unique=True)
     group_name = Column(String, unique=True)
 
     screens = relationship("Screen", back_populates="project")
@@ -12,8 +13,9 @@ class Project(Base):
 
 class Screen(Base):
     __tablename__ = 'screens'
+    __table_args__ = (UniqueConstraint('screen_number', 'project_id', name='uq_screen_number_project'),)
     id = Column(Integer, primary_key=True)
-    screen_number = Column(Integer, nullable=False, unique=True)
+    screen_number = Column(Integer, nullable=False)
     screen_description = Column(String)
     barcode = Column(String)
     project_id = Column(Integer, ForeignKey('projects.id'))

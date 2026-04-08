@@ -49,7 +49,7 @@ def _parse_barcode(barcode):
 
 
 
-def run_import(csv_file, img_path=None, source_path=None, specimen_type=None):
+def run_import(csv_file, img_path=None, source_path=None, specimen_type=None, group_name=None, project_name=None, screen_description=None):
     df = pd.read_csv(csv_file)
     session = SessionLocal()
 
@@ -71,8 +71,8 @@ def run_import(csv_file, img_path=None, source_path=None, specimen_type=None):
 
 
         # Management
-        project = import_management.import_project(session, "Group name to be added")
-        screen = import_management.import_screen(session, project, screen_number, experiment_barcode, "Experiment description")
+        project = import_management.import_project(session, group_name or "Group name to be added", project_name)
+        screen = import_management.import_screen(session, project, screen_number, experiment_barcode, screen_description)
         plate = import_management.import_plate(session, screen, plate_num, plate_barcode, date_exp, project)
         import_management.import_location(session, plate, img_path, source_path)
 
@@ -113,8 +113,17 @@ if __name__ == "__main__":
         specimen_type = ingestion_row.get("specimen")
         if pd.isna(specimen_type) or specimen_type is None:
             specimen_type = "human"
+        group_name = ingestion_row.get("group_name")
+        if pd.isna(group_name):
+            group_name = None
+        project_name = ingestion_row.get("project_name")
+        if pd.isna(project_name):
+            project_name = None
+        screen_description = ingestion_row.get("screen_description")
+        if pd.isna(screen_description):
+            screen_description = None
         full_path = os.path.join(BASE_PATH, filename)
-        run_import(full_path, img_path=str(img_path), source_path=str(filename), specimen_type=str(specimen_type).strip().lower())
+        run_import(full_path, img_path=str(img_path), source_path=str(filename), specimen_type=str(specimen_type).strip().lower(), group_name=group_name, project_name=project_name, screen_description=screen_description)
 
     print("✅ Data loading completed")
 
