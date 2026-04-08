@@ -10,6 +10,7 @@ class Substance(Base):
     '''
     __tablename__ = 'substances'
     id = Column(Integer, primary_key=True)
+    hash = Column(String(64), unique=True, nullable=False)
     name = Column(String, nullable=False)
     type = Column(String, nullable=False)
     catalog_id = Column(String, nullable=False)
