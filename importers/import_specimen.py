@@ -1,5 +1,7 @@
-from models import Specimen, HumanDonor, MouseDonor, Virus, Bacteria, CellType, CellCharacteristics, Anticoagulat 
+from models import Specimen, HumanDonor, MouseDonor, Virus, Bacteria, CellType, CellCharacteristics, Anticoagulant 
 from sqlalchemy.orm import Session
+import json
+from pathlib import Path
 
 
 def _none_if_missing(value):
@@ -49,6 +51,46 @@ def _parse_binary(value):
     return None
 
 
+_PUBCHEM_HASH_BY_NAME = None
+
+
+def _normalize_substance_name(name):
+    return str(name).strip().lower()
+
+
+def _load_pubchem_hashes():
+    global _PUBCHEM_HASH_BY_NAME
+    if _PUBCHEM_HASH_BY_NAME is not None:
+        return _PUBCHEM_HASH_BY_NAME
+
+    pubchem_path = Path(__file__).resolve().parent.parent / "pubchem_data.json"
+    hash_by_name = {}
+    try:
+        with pubchem_path.open("r", encoding="utf-8") as f:
+            payload = json.load(f)
+        for item in payload.get("results", []):
+            common_name = item.get("common_name")
+            hash_sha256_8 = item.get("hash_sha256_8")
+            if not hash_sha256_8:
+                continue
+
+            hash_value = str(hash_sha256_8)
+
+            if common_name:
+                hash_by_name[_normalize_substance_name(common_name)] = hash_value
+
+            synonyms = item.get("depositor-supplied-synonyms") or []
+            if isinstance(synonyms, list):
+                for synonym in synonyms:
+                    if synonym and isinstance(synonym, str):
+                        hash_by_name.setdefault(_normalize_substance_name(synonym), hash_value)
+    except (OSError, ValueError, TypeError):
+        hash_by_name = {}
+
+    _PUBCHEM_HASH_BY_NAME = hash_by_name
+    return _PUBCHEM_HASH_BY_NAME
+
+
 def import_anticoagulant(session: Session, anticoagulant_name):
     anticoagulant_name = _none_if_missing(anticoagulant_name)
     if anticoagulant_name is None:
@@ -58,13 +100,27 @@ def import_anticoagulant(session: Session, anticoagulant_name):
     if not name or name.lower() == "nan":
         return None
 
-    anticoagulant = (
-        session.query(Anticoagulat)
-        .filter_by(anticoagulant_name=name)
-        .first()
-    )
+    pubchem_hashes = _load_pubchem_hashes()
+    anticoagulant_hash = pubchem_hashes.get(_normalize_substance_name(name))
+
+    # If not found in PubChem, store a non-hash marker.
+    if not anticoagulant_hash:
+        anticoagulant_hash = "non available"
+
+    if anticoagulant_hash == "non available":
+        anticoagulant = (
+            session.query(Anticoagulant)
+            .filter_by(hash=anticoagulant_hash, anticoagulant_name=name)
+            .first()
+        )
+    else:
+        anticoagulant = (
+            session.query(Anticoagulant)
+            .filter_by(hash=anticoagulant_hash)
+            .first()
+        )
     if not anticoagulant:
-        anticoagulant = Anticoagulat(anticoagulant_name=name)
+        anticoagulant = Anticoagulant(hash=anticoagulant_hash, anticoagulant_name=name)
         session.add(anticoagulant)
         session.flush()
 
@@ -124,7 +180,7 @@ def import_specimen(session: Session, row: dict):
             .first()
         )
         if specimen:
-            specimen.anticoagulat = anticoagulant
+            specimen.anticoagulant = anticoagulant
         if not specimen:
             specimen = HumanDonor(
                 name=donor_name,
@@ -135,7 +191,7 @@ def import_specimen(session: Session, row: dict):
                 blood_type=_to_optional_str(row.get("blood_type")),
                 age=_to_optional_int(row.get("age")),
                 sex=_to_optional_str(row.get("sex")),
-                anticoagulat=anticoagulant,
+                anticoagulant=anticoagulant,
                 cell_type=cell_type,
                 cell_characteristic=cell_char,
             )
@@ -149,13 +205,13 @@ def import_specimen(session: Session, row: dict):
             .first()
         )
         if specimen:
-            specimen.anticoagulat = anticoagulant
+            specimen.anticoagulant = anticoagulant
         if not specimen:
             specimen = MouseDonor(
                 name=_to_optional_str(row.get("donor_ID")) or "unknown",#donor_name,
                 strain=_to_optional_str(row.get("strain")) or "C57BL/6",
                 transgene=_to_optional_str(row.get("transgene")),
-                anticoagulat=anticoagulant,
+                anticoagulant=anticoagulant,
                 cell_type=cell_type,
                 cell_characteristic=cell_char,
             )
@@ -194,3 +250,5 @@ def import_specimen(session: Session, row: dict):
         raise ValueError(f"Unknown donor_type: {donor_type}")
 
     return specimen
+
+

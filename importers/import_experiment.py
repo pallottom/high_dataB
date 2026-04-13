@@ -1,6 +1,5 @@
 from models import ConditionClass, Condition, Substance, Treatment, Experiment
 import pandas as pd
-import hashlib
 import json
 from pathlib import Path
 
@@ -78,11 +77,9 @@ def import_substance(session, name, type="small_molecule", vendor="default_vendo
     pubchem_hashes = _load_pubchem_hashes()
     substance_hash = pubchem_hashes.get(_normalize_substance_name(name_str))
 
-    # Fallback keeps imports working when a name is not present in pubchem_data.json.
+    # If not found in PubChem, store a non-hash marker.
     if not substance_hash:
-        substance_hash = hashlib.sha256(
-            f"{name_str}|{type}|{vendor}".encode("utf-8")
-        ).hexdigest()
+        substance_hash = "not available"
 
     substance = session.query(Substance).filter_by(hash=substance_hash).first()
     if not substance:
