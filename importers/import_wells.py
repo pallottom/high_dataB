@@ -4,11 +4,11 @@ import re
 
 
 
-def _parse_wellkey(well_key: str):
+def _normalize_wellkey(well_key: str):
     """
-    Parse a well key into row and column.
+    Normalize and validate a well key.
     Accepts formats like A1, A01, A12, A_1, A-12, A 12, etc.
-    Returns: (row, column)
+    Returns: normalized key (e.g. A01)
     """
     rows_allowed = 'ABCDEFGHIJKLMNOP'
     max_col = 24
@@ -22,32 +22,28 @@ def _parse_wellkey(well_key: str):
         raise ValueError(f"Invalid well key format: '{well_key}'")
 
     row_letter, col_str = match.groups()
-    row = rows_allowed.find(row_letter) + 1
     column = int(col_str)
 
     if column > max_col:
         raise ValueError(
             f"Column of well_key '{well_key}' must not be larger than {max_col}"
         )
-    if row == 0:
-        raise ValueError(
-            f"Row of well_key '{well_key}' is invalid, must be one of {rows_allowed}"
-        )
+
+    if row_letter not in rows_allowed:
+        raise ValueError(f"Row of well_key '{well_key}' is invalid, must be one of {rows_allowed}")
     
     normalized_well_key = f"{row_letter}{col_str.zfill(2)}"
 
-    return str(row), str(column), str(normalized_well_key)
+    return str(normalized_well_key)
 
 
 
 def import_well(session, plate, well_key, specimen, screen=None):
     """Get or create a Well, reusing parsing logic from create_well."""
-    row, col, normalized_well_key = _parse_wellkey(well_key)  # parse to use in query
+    normalized_well_key = _normalize_wellkey(well_key)
 
     well = session.query(Well).filter_by(
         well_key=normalized_well_key,
-        col=col,
-        row=row,
         plate=plate,
         specimen=specimen
     ).first()
@@ -55,8 +51,6 @@ def import_well(session, plate, well_key, specimen, screen=None):
     if not well:
         well = Well(
             well_key=normalized_well_key, 
-            col=col, 
-            row=row, 
             plate=plate, 
             specimen=specimen 
             ) 
