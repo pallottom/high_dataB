@@ -89,9 +89,9 @@ class Well(Base):
     # Experiment.well provides the reverse. Useful for storing QC pass/fail status per well.
     experiment = relationship("Experiment", back_populates="well", uselist=False)
     
-    # One-to-many: This well can have multiple Measurement records (e.g., Tnfa, Il1b, Nuc).
-    # Measurement.well provides the reverse. Each measurement type aggregates results for this well.
-    measurements = relationship("Measurement", back_populates="well")
+    # One-to-many: This well can have multiple numeric measurement values.
+    # MeasurementValue.well provides the reverse.
+    measurements = relationship("MeasurementValue", back_populates="well")
     
     # Note: experiment_id is NOT stored as a separate column because Experiment.well_id is the FK.
     # The ORM relationship maintains bidirectional consistency via back_populates.

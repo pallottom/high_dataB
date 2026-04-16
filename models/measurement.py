@@ -1,141 +1,174 @@
-from sqlalchemy import Column, Integer, String, Float, Boolean, JSON, ForeignKey, Sequence
+"""
+Module: measurement.py
+
+Purpose:
+        Defines the measurement branch of the assay database, including the
+        measurement experiment hierarchy (Essay, IMMUNX, SequencingExperiment),
+        feature dictionary, and numeric measurement facts.
+
+Model overview:
+        - Essay: Polymorphic base table for measurement experiment types.
+        - IMMUNX: Specialized experiment subtype with target/population/
+            biological component metadata.
+        - Target, Population, CellCompartment: Lookup tables used by IMMUNX.
+        - PrimaryFeature: Canonical dictionary of measurable feature keys.
+        - MeasurementValue: Fact table storing numeric values per
+            well/experiment/feature combination.
+
+Cardinality:
+        - One Essay experiment can have many MeasurementValue rows.
+        - One Well can have many MeasurementValue rows.
+        - One PrimaryFeature can be referenced by many MeasurementValue rows.
+        - One IMMUNX row can reference one Target, one Population,
+            and one CellCompartment.
+
+Key Design Decisions:
+        - Joined-table inheritance is used for experiment subtypes.
+        - Feature definitions are normalized in a dedicated dictionary table.
+        - Measurement identity is protected by a composite unique constraint on
+            (well_id, experiment_id, primary_feature_id, replicate_index).
+"""
+
+from sqlalchemy import (
+    Column,
+    Integer,
+    Float,
+    String,
+    ForeignKey,
+    UniqueConstraint,
+    Index,
+)
 from sqlalchemy.orm import relationship
+
 from database import Base
 
-measurement_id_seq = Sequence('specimen_id_seq', start=1)
+
+class Essay(Base):
+    """
+    Base class for measurement experiment types.
+    Child tables: immunx, image_based, sequencing.
+    This gives freedom to add experiment-specific metadata in the future while keeping a common interface for measurements.
+    """
+
+    __tablename__ = "Essay"
+
+    id = Column(Integer, primary_key=True)
+    type = Column(String(50), nullable=False)  # immunx, image_based, sequencing
+
+    measurements = relationship("MeasurementValue", back_populates="experiment")
+
+    __mapper_args__ = {
+        "polymorphic_identity": "measurement_experiment",
+        "polymorphic_on": type,
+    }
+class Target(Base):
+    __tablename__ = "target"
+
+    id = Column(Integer, primary_key=True)
+    name = Column(String(255), nullable=False)
+    description = Column(String(1024), nullable=True)
+
+    immunx_experiments = relationship("IMMUNX", back_populates="target")
 
 
-#### PARENT CLASS #####
+class Population(Base):
+    __tablename__ = "population"
 
-class Measurement(Base):
-    __tablename__="measurement"
-    id = Column(Integer, measurement_id_seq, primary_key=True, server_default=measurement_id_seq.next_value())
-    type = Column(String(50), nullable=False)  # "homogeneous", "image_based", "sequencing"
-    well_id = Column(Integer, ForeignKey("wells.id"), nullable=False) 
+    id = Column(Integer, primary_key=True)
+    name = Column(String(255), nullable=False)
+    description = Column(String(1024), nullable=True)
 
+    immunx_experiments = relationship("IMMUNX", back_populates="population")
+
+
+class CellCompartment(Base):
+    __tablename__ = "cell_compartment"
+
+    id = Column(Integer, primary_key=True)
+    name = Column(String(255), nullable=False)
+    description = Column(String(1024), nullable=True)
+
+    immunx_experiments = relationship("IMMUNX", back_populates="biological_component")
+
+
+class IMMUNX(Essay):
+    __tablename__ = "immunx"
+
+    id = Column(Integer, ForeignKey("Essay.id"), primary_key=True)
+    target_id = Column(Integer, ForeignKey("target.id"), nullable=True)
+    population_id = Column(Integer, ForeignKey("population.id"), nullable=True)
+    biological_component_id = Column(Integer, ForeignKey("cell_compartment.id"), nullable=True)
+
+    target = relationship("Target", back_populates="immunx_experiments")
+    population = relationship("Population", back_populates="immunx_experiments")
+    biological_component = relationship("CellCompartment", back_populates="immunx_experiments")
+
+    __mapper_args__ = {
+        "polymorphic_identity": "immunx",
+    }
+
+
+
+class SequencingExperiment(Essay):
+    __tablename__ = "sequencing"
+
+    id = Column(Integer, ForeignKey("Essay.id"), primary_key=True)
+
+    __mapper_args__ = {
+        "polymorphic_identity": "sequencing",
+    }
+
+
+class PrimaryFeature(Base):
+    """
+    Canonical measurement feature dictionary.
+    Examples: area, volume, diameter, number.
+    """
+
+    __tablename__ = "feature"
+
+    __table_args__ = (
+        UniqueConstraint("key", name="uq_primary_feature_key"),
+    )
+
+    id = Column(Integer, primary_key=True)
+    key = Column(String(100), nullable=False)
+    name = Column(String(255), nullable=False)
+    unit = Column(String(50), nullable=True)
+
+    measurements = relationship("MeasurementValue", back_populates="primary_feature")
+
+
+class MeasurementValue(Base):
+    """
+    Single fact table for numeric measurements.
+    """
+
+    __tablename__ = "measurement_values"
+
+    __table_args__ = (
+        UniqueConstraint(
+            "well_id",
+            "experiment_id",
+            "primary_feature_id",
+            "replicate_index",
+            name="uq_measurement_value_identity",
+        ),
+        Index("idx_measurement_value_feature_experiment", "primary_feature_id", "experiment_id"),
+        Index("idx_measurement_value_well", "well_id"),
+        Index("idx_measurement_value_experiment", "experiment_id"),
+    )
+
+    id = Column(Integer, primary_key=True)
+    value = Column(Float, nullable=False)
+
+    experiment_id = Column(Integer, ForeignKey("Essay.id"), nullable=False)
+    primary_feature_id = Column(Integer, ForeignKey("feature.id"), nullable=False)
+    well_id = Column(Integer, ForeignKey("wells.id"), nullable=False)
+
+    replicate_index = Column(Integer, nullable=False, default=0)
+
+    experiment = relationship("Essay", back_populates="measurements")
+    primary_feature = relationship("PrimaryFeature", back_populates="measurements")
     well = relationship("Well", back_populates="measurements")
 
-
-    
-    __mapper_args__ = {
-        'polymorphic_identity': 'measurement',
-        'polymorphic_on': type  # quello che passa alla child class
-    }
-
-    def __repr__(self):
-        return f"<Measurement(id={self.id}, type='{self.type}')>"
-    
-
-
-#### MEASUREMENT CHILD CLASSES #####
-
-class Homogeneous(Measurement):
-    __tablename__ = "homogeneous"
-    id = Column(Integer, ForeignKey("measurement.id"), primary_key=True)
-
-    homogeneous_type = Column(String(100), nullable=False)
-
-    # Relationships
-
-    __mapper_args__ = {
-        'polymorphic_identity': 'homogeneous',
-        'polymorphic_on': homogeneous_type 
-    }
-
-
-class ImageBased(Measurement):
-    __tablename__ = "image_based"
-    id = Column(Integer, ForeignKey("measurement.id"), primary_key=True)
-
-    image_type = Column(String(100), nullable=False)
-
-    # Relationships
-
-    __mapper_args__ = {
-        'polymorphic_identity': 'imaged_based',
-        'polymorphic_on': image_type 
-    }
-
-
-#### HOMOGENEOUS CHILD CLASSES #####
-
-class Hhf(Homogeneous):
-    __tablename__ = "hhf"
-    id = Column(Integer, ForeignKey("homogeneous.id"), primary_key=True)
-
-    em616_IL1b = Column(Float, nullable=False)
-    em665_IL1b = Column(Float, nullable=False)
-
-    # Relationships
-
-    __mapper_args__ = {
-        'polymorphic_identity': 'hhf',
-    }
-
-
-class Enzymatic(Homogeneous):
-    __tablename__ = "enzymatic"
-    id = Column(Integer, ForeignKey("homogeneous.id"), primary_key=True)
-
-    col1 = Column(Float, nullable=False)
-    col2 = Column(Float, nullable=False)
-
-    # Relationships
-
-    __mapper_args__ = {
-        'polymorphic_identity': 'enzymatic',
-    }
-
-
-#### IMAGE_BASED CHILD CLASSES #####
-
-class Nuc(ImageBased):
-    __tablename__ = "nuc"
-    id = Column(Integer, ForeignKey("image_based.id"), primary_key=True)
-
-    Cells_count = Column(Float, nullable=False)
-    Area = Column(Float, nullable=False)
-    Diameter = Column(Float, nullable=False)
-
-    # Relationships
-
-    __mapper_args__ = {
-        'polymorphic_identity': 'nuc',
-    }
-
-class Tnfa(ImageBased):
-    __tablename__ = "tnfa"
-    id = Column(Integer, ForeignKey("image_based.id"), primary_key=True)
-
-    Em616 = Column(Float, nullable=True)
-    Em665 = Column(Float, nullable=True)
-    Count = Column(Float, nullable=True)
-    Area_Total = Column(Float, nullable=True)
-    Area_Avg = Column(Float, nullable=True)
-    Diameter_Total = Column(Float, nullable=True)
-    Diameter_Avg = Column(Float, nullable=True)
-
-    # Relationships
-
-    __mapper_args__ = {
-        'polymorphic_identity': 'tnfa',
-    }
-
-class Il1b(ImageBased):
-    __tablename__ = "il1b"
-    id = Column(Integer, ForeignKey("image_based.id"), primary_key=True)
-
-    Em616 = Column(Float, nullable=True)
-    Em655 = Column(Float, nullable=True)
-    IL1bPosCells_count= Column(Float, nullable=False)
-    Il1bCircularity = Column(Float, nullable=False)
-    Il1bDiameter = Column(Float, nullable=False)
-    IL1bCompactness = Column(Float, nullable=False)
-    Il1bAnisometry = Column(Float, nullable=False)
-    IL1bTotalIntensity_CH3 = Column(Float, nullable=False)
-
-    # Relationships
-
-    __mapper_args__ = {
-        'polymorphic_identity': 'il1b',
-    }
