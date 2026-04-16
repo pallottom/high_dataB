@@ -66,6 +66,7 @@ class Screen(Base):
     Relationships:
         project: Many-to-one. Each screen belongs to exactly one project.
         plates: One-to-many. A screen can contain many plates.
+        imagings: One-to-many. A screen can contain multiple imaging setups.
 
     Constraints:
         - UniqueConstraint(screen_number, project_id): The same screen number may
@@ -85,6 +86,90 @@ class Screen(Base):
 
     project = relationship("Project", back_populates="screens")
     plates = relationship("Plate", back_populates="screen", foreign_keys="Plate.screen_id")
+    imagings = relationship("Imaging", back_populates="screen")
+
+
+class Imaging(Base):
+    """
+    Imaging setup associated with a screen.
+
+    Attributes:
+        id (int): Primary key.
+        screen_id (int): Foreign key to the related screen.
+        instrument (str): Instrument used for acquisition.
+
+    Relationships:
+        screen: Many-to-one. Parent screen for this imaging setup.
+        channels: One-to-many. Channels configured for this imaging setup.
+    """
+
+    __tablename__ = 'imaging'
+
+    id = Column(Integer, primary_key=True)
+    screen_id = Column(Integer, ForeignKey('screens.id'), nullable=False)
+    instrument = Column(String, nullable=False)
+
+    screen = relationship("Screen", back_populates="imagings")
+    channels = relationship("Channel", back_populates="imaging")
+
+
+class Antibody(Base):
+    """
+    Antibody reference used by imaging channels.
+
+    Attributes:
+        id (int): Primary key.
+        vendor (str): Antibody vendor.
+        lot (str): Lot identifier.
+        catalogue_number (str): Vendor catalogue number.
+        coniugated_fluorochrome (str): Conjugated fluorochrome label.
+
+    Relationships:
+        channels: One-to-many. Channels that use this antibody.
+    """
+
+    __tablename__ = 'antibodies'
+
+    id = Column(Integer, primary_key=True)
+    vendor = Column(String, nullable=False)
+    lot = Column(String, nullable=True)
+    catalogue_number = Column(String, nullable=True)
+    coniugated_fluorochrome = Column(String, nullable=True)
+
+    channels = relationship("Channel", back_populates="antibody")
+
+
+class Channel(Base):
+    """
+    Channel metadata for one imaging setup.
+
+    Attributes:
+        id (int): Primary key.
+        imaging_id (int): Foreign key to the parent imaging setup.
+        channel_number (int): Ordered channel index (e.g., 1..N).
+        filter_set (str): Filter set used for the channel.
+        antibody_id (int): Optional foreign key to antibodies.id.
+        staining_target (str): Biological target for staining.
+
+    Relationships:
+        imaging: Many-to-one. Parent imaging setup.
+        antibody: Many-to-one. Optional antibody used for the channel.
+    """
+
+    __tablename__ = 'channels'
+    __table_args__ = (
+        UniqueConstraint('imaging_id', 'channel_number', name='uq_channel_per_imaging'),
+    )
+
+    id = Column(Integer, primary_key=True)
+    imaging_id = Column(Integer, ForeignKey('imaging.id'), nullable=False)
+    channel_number = Column(Integer, nullable=False)
+    filter_set = Column(String, nullable=True)
+    antibody_id = Column(Integer, ForeignKey('antibodies.id'), nullable=True)
+    staining_target = Column(String, nullable=True)
+
+    imaging = relationship("Imaging", back_populates="channels")
+    antibody = relationship("Antibody", back_populates="channels")
 
 
 class Plate(Base):

@@ -1,6 +1,13 @@
 import pandas as pd
-from models import Measurement, Tnfa, Il1b
 from sqlalchemy.orm import Session
+
+from models import (
+    MeasurementValue,
+    Essay,
+    IMMUNX,
+    SequencingExperiment,
+    PrimaryFeature,
+)
 
 
 def _to_float(value):
@@ -11,77 +18,55 @@ def _to_float(value):
     except (TypeError, ValueError):
         return None
 
-def _import_il1b(session: Session, well, row: dict):
-    il1b_measurement = (
-        session.query(Il1b)
-        .filter(Il1b.well_id == well.id)
-        .first()
-    )
 
-    il1b_values = {
-        "Em616": _to_float(row.get("Em616_IL1b")),
-        "Em655": _to_float(row.get("Em665_IL1b")),
+def _get_or_create_feature(session: Session, key: str, name: str, unit: str | None = None):
+    feature = session.query(PrimaryFeature).filter_by(key=key).first()
+    if feature:
+        return feature
+    feature = PrimaryFeature(key=key, name=name, unit=unit)
+    session.add(feature)
+    session.flush()
+    return feature
+
+
+def _get_or_create_experiment(session: Session, exp_type: str):
+    exp = session.query(Essay).filter_by(type=exp_type).first()
+    if exp:
+        return exp
+
+    cls_map = {
+        "immunx": IMMUNX,
+        "homogeneous": IMMUNX,
+        "image_based": Essay,
+        "sequencing": SequencingExperiment,
     }
-
-    if il1b_measurement:
-        for key, value in il1b_values.items():
-            setattr(il1b_measurement, key, value)
-        return il1b_measurement
-
-    if any(value is not None for value in il1b_values.values()):
-        il1b_measurement = Il1b(
-            well_id=well.id,
-            type="imaged_based",
-            image_type="il1b",
-            IL1bPosCells_count=0.0,
-            Il1bCircularity=0.0,
-            Il1bDiameter=0.0,
-            IL1bCompactness=0.0,
-            Il1bAnisometry=0.0,
-            IL1bTotalIntensity_CH3=0.0,
-            **il1b_values,
-        )
-        session.add(il1b_measurement)
-        session.flush()
-        return il1b_measurement
-
-    return None
+    exp_cls = cls_map.get(exp_type, Essay)
+    exp = exp_cls(type=exp_type)
+    session.add(exp)
+    session.flush()
+    return exp
 
 
-def _import_tnfa(session: Session, well, row: dict):
-    tnfa_measurement = (
-        session.query(Tnfa)
-        .filter(Tnfa.well_id == well.id)
-        .first()
-    )
+def _collect_measurements(row: dict):
+    # Map source columns to canonical primary-feature keys.
+    mappings = [
+        ("em616", "Em616_TNFa", "Em616 signal", None),
+        ("em665", "Em665_TNFa", "Em665 signal", None),
+        ("em616", "Em616_IL1b", "Em616 signal", None),
+        ("em665", "Em665_IL1b", "Em665 signal", None),
+        ("count", "[Cell_SpeckTNFaCells] (TNFa (cells)) COUNT (AVG)", "Cell count", "cells"),
+        ("area", "[Cell_SpeckTNFaCells] (TNFa (cells)) Area AVG (AVG)", "Area", None),
+        ("area_total", "[Cell_SpeckTNFaCells] (TNFa (cells)) Area TOTAL (AVG)", "Area total", None),
+        ("diameter", "[Cell_SpeckTNFaCells] (TNFa (cells)) Diameter AVG (AVG)", "Diameter", None),
+        ("diameter_total", "[Cell_SpeckTNFaCells] (TNFa (cells)) Diameter TOTAL (AVG)", "Diameter total", None),
+    ]
 
-    tnfa_values = {
-        "Em616": _to_float(row.get("Em616_TNFa")),
-        "Em665": _to_float(row.get("Em665_TNFa")),
-        "Count": _to_float(row.get("[Cell_SpeckTNFaCells] (TNFa (cells)) COUNT (AVG)")),
-        "Area_Total": _to_float(row.get("[Cell_SpeckTNFaCells] (TNFa (cells)) Area TOTAL (AVG)")),
-        "Area_Avg": _to_float(row.get("[Cell_SpeckTNFaCells] (TNFa (cells)) Area AVG (AVG)")),
-        "Diameter_Total": _to_float(row.get("[Cell_SpeckTNFaCells] (TNFa (cells)) Diameter TOTAL (AVG)")),
-        "Diameter_Avg": _to_float(row.get("[Cell_SpeckTNFaCells] (TNFa (cells)) Diameter AVG (AVG)")),
-    }
-
-    if tnfa_measurement:
-        for key, value in tnfa_values.items():
-            setattr(tnfa_measurement, key, value)
-        return tnfa_measurement
-
-    if any(value is not None for value in tnfa_values.values()):
-        tnfa_measurement = Tnfa(
-            well_id=well.id,
-            type="imaged_based",
-            image_type="tnfa",
-            **tnfa_values,
-        )
-        session.add(tnfa_measurement)
-        session.flush()
-        return tnfa_measurement
-
-    return None
+    collected = []
+    for key, source_col, name, unit in mappings:
+        value = _to_float(row.get(source_col))
+        if value is not None:
+            collected.append((key, name, unit, value))
+    return collected
 
 
 def import_measurement(session: Session, row: dict):
@@ -89,10 +74,27 @@ def import_measurement(session: Session, row: dict):
     if well is None:
         raise ValueError("import_measurement requires row['__well'] with a Well instance")
 
-    il1b_measurement = _import_il1b(session, well, row)
-    tnfa_measurement = _import_tnfa(session, well, row)
+    exp_type = "image_based"
+    experiment = _get_or_create_experiment(session, exp_type)
 
-    return il1b_measurement or tnfa_measurement
+    values = _collect_measurements(row)
+    created = []
+    for feature_key, feature_name, feature_unit, numeric_value in values:
+        feature = _get_or_create_feature(session, feature_key, feature_name, feature_unit)
+        measurement = MeasurementValue(
+            value=numeric_value,
+            experiment_id=experiment.id,
+            primary_feature_id=feature.id,
+            well_id=well.id,
+            replicate_index=0,
+        )
+        session.add(measurement)
+        created.append(measurement)
+
+    if created:
+        session.flush()
+        return created[0]
+    return None
 
 
 def get_or_create_default_measurement(session: Session, well, row=None):
@@ -103,16 +105,9 @@ def get_or_create_default_measurement(session: Session, well, row=None):
         if measurement is not None:
             return measurement
 
-        return session.query(Measurement).filter_by(well_id=well.id).first()
-
-    measurement = session.query(Measurement).filter_by(
-        type="measurement",
-        well_id=well.id).first()
-    if not measurement:
-        measurement = Measurement(
-            type="measurement",
-            well_id=well.id
-        )
-        session.add(measurement)
-        session.flush()
-    return measurement
+    return (
+        session.query(MeasurementValue)
+        .filter_by(well_id=well.id)
+        .order_by(MeasurementValue.id.asc())
+        .first()
+    )
