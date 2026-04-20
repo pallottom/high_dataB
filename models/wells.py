@@ -15,6 +15,7 @@ Key Design Decisions:
     - well_key is the canonical coordinate (e.g., A01, B12) — row and column are derived from this, not stored.
     - plate_id is non-null because every well must belong to a plate.
     - specimen_id is non-null because a well must always hold a specimen.
+    - experiment_id is an optional one-to-one link to experiments.id.
     - UniqueConstraint(plate_id, well_key) prevents duplicate well coordinates within the same plate.
     - Indexes on plate_id and specimen_id optimize FK lookups for high-throughput queries.
 """
@@ -35,6 +36,7 @@ class Well(Base):
                        Format is derived from (row, column) but not stored separately to avoid redundancy.
         specimen_id (int): Foreign key to specimens table. Non-null; every well must hold a specimen.
         plate_id (int): Foreign key to plates table. Non-null; every well must belong to a plate.
+        experiment_id (int): Optional foreign key to experiments.id.
     
     Relationships:
         plate: Many-to-one. This well belongs to exactly one plate.
@@ -74,6 +76,9 @@ class Well(Base):
     # This is the table context that gives the well its meaning within a screening run.
     plate_id = Column(Integer, ForeignKey('plates.id'), nullable=False)
 
+    # Optional one-to-one link to experiment state.
+    experiment_id = Column(Integer, ForeignKey('experiments.id'), unique=True)
+
     # Relationships
     # ============
     
@@ -87,11 +92,10 @@ class Well(Base):
     
     # One-to-one: This well has at most one Experiment state record (uselist=False enforces singular).
     # Experiment.well provides the reverse. Useful for storing QC pass/fail status per well.
-    experiment = relationship("Experiment", back_populates="well", uselist=False)
+    experiment = relationship("Experiment", back_populates="well", uselist=False, foreign_keys=[experiment_id])
     
     # One-to-many: This well can have multiple numeric measurement values.
     # MeasurementValue.well provides the reverse.
     measurements = relationship("MeasurementValue", back_populates="well")
     
-    # Note: experiment_id is NOT stored as a separate column because Experiment.well_id is the FK.
-    # The ORM relationship maintains bidirectional consistency via back_populates.
+    # experiment_id is stored directly on the well as the one-to-one experiment link.
