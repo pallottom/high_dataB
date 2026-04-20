@@ -13,21 +13,28 @@ def import_project(session, group_name, project_name=None):
     return project
 
 
-def import_screen(session, project, screen_number, barcode, description=None):
+def import_screen(session, project, screen_number, description=None):
     screen = session.query(Screen).filter_by(screen_number=screen_number, project=project).first()
     if screen:
         # Update the existing screen if it already exists
         screen.screen_description = description
-        screen.barcode = barcode
     else:
         # Create a new screen if it doesn't exist
-        screen = Screen(screen_number=screen_number, screen_description=description, barcode=barcode, project=project)
+        screen = Screen(
+            screen_number=screen_number,
+            screen_description=description,
+            project=project,
+        )
         session.add(screen)
+
     session.commit()
     return screen
 
 
 def import_plate(session, screen, name, barcode, date_experiment, project):
+    if barcode is None or not str(barcode).strip():
+        raise ValueError("Plate barcode is required")
+
     plate = session.query(Plate).filter_by(barcode=barcode).first()
     if plate:
         # Update the existing plate if it already exists

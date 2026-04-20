@@ -171,10 +171,12 @@ def import_experiment(session, row, well, measurement):
         )
 
     # --- Experiment ---
-    experiment = session.query(Experiment).filter_by(
-        well_id=well.id, 
-        condition_id=condition.id
-        ).first()
+    experiment = None
+    if well.experiment_id is not None:
+        experiment = session.query(Experiment).filter_by(id=well.experiment_id).first()
+
+    if experiment is not None and experiment.condition_id != condition.id:
+        experiment = None
     
     if not experiment:
         htrf_data_il1b = row.get("htrf_il1b_data")
@@ -182,10 +184,14 @@ def import_experiment(session, row, well, measurement):
         qc_status = "pass" if (pd.notna(htrf_data_il1b) or pd.notna(htrf_data_tnfa)) else "fail"
 
         experiment = Experiment(
-            well_id=well.id,
             condition_id=condition.id,
             #measurement_id=measurement.id,
             qc=qc_status
         )
         session.add(experiment)
+        session.flush()
+        well.experiment_id = experiment.id
+    elif well.experiment_id != experiment.id:
+        well.experiment_id = experiment.id
+
     return experiment

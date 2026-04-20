@@ -26,7 +26,7 @@ Key Design Decisions:
         - Joined-table inheritance is used for experiment subtypes.
         - Feature definitions are normalized in a dedicated dictionary table.
         - Measurement identity is protected by a composite unique constraint on
-            (well_id, experiment_id, primary_feature_id, replicate_index).
+            (well_id, essay_id, feature_id, replicate_index).
 """
 
 from sqlalchemy import (
@@ -50,7 +50,7 @@ class Essay(Base):
     This gives freedom to add experiment-specific metadata in the future while keeping a common interface for measurements.
     """
 
-    __tablename__ = "Essay"
+    __tablename__ = "essay"
 
     id = Column(Integer, primary_key=True)
     type = Column(String(50), nullable=False)  # immunx, image_based, sequencing
@@ -88,20 +88,21 @@ class CellCompartment(Base):
     name = Column(String(255), nullable=False)
     description = Column(String(1024), nullable=True)
 
-    immunx_experiments = relationship("IMMUNX", back_populates="biological_component")
+    immunx_experiments = relationship("IMMUNX", back_populates="cell_compartment")
 
 
 class IMMUNX(Essay):
     __tablename__ = "immunx"
 
-    id = Column(Integer, ForeignKey("Essay.id"), primary_key=True)
+    id = Column(Integer, ForeignKey("essay.id"), primary_key=True)
+    emission = Column(Float, nullable=True)
     target_id = Column(Integer, ForeignKey("target.id"), nullable=True)
     population_id = Column(Integer, ForeignKey("population.id"), nullable=True)
-    biological_component_id = Column(Integer, ForeignKey("cell_compartment.id"), nullable=True)
+    cell_compartment_id = Column(Integer, ForeignKey("cell_compartment.id"), nullable=True)
 
     target = relationship("Target", back_populates="immunx_experiments")
     population = relationship("Population", back_populates="immunx_experiments")
-    biological_component = relationship("CellCompartment", back_populates="immunx_experiments")
+    cell_compartment = relationship("CellCompartment", back_populates="immunx_experiments")
 
     __mapper_args__ = {
         "polymorphic_identity": "immunx",
@@ -112,7 +113,7 @@ class IMMUNX(Essay):
 class SequencingExperiment(Essay):
     __tablename__ = "sequencing"
 
-    id = Column(Integer, ForeignKey("Essay.id"), primary_key=True)
+    id = Column(Integer, ForeignKey("essay.id"), primary_key=True)
 
     __mapper_args__ = {
         "polymorphic_identity": "sequencing",
@@ -149,21 +150,21 @@ class MeasurementValue(Base):
     __table_args__ = (
         UniqueConstraint(
             "well_id",
-            "experiment_id",
-            "primary_feature_id",
+            "essay_id",
+            "feature_id",
             "replicate_index",
             name="uq_measurement_value_identity",
         ),
-        Index("idx_measurement_value_feature_experiment", "primary_feature_id", "experiment_id"),
+        Index("idx_measurement_value_feature_experiment", "feature_id", "essay_id"),
         Index("idx_measurement_value_well", "well_id"),
-        Index("idx_measurement_value_experiment", "experiment_id"),
+        Index("idx_measurement_value_experiment", "essay_id"),
     )
 
     id = Column(Integer, primary_key=True)
     value = Column(Float, nullable=False)
 
-    experiment_id = Column(Integer, ForeignKey("Essay.id"), nullable=False)
-    primary_feature_id = Column(Integer, ForeignKey("feature.id"), nullable=False)
+    essay_id = Column(Integer, ForeignKey("essay.id"), nullable=False)
+    feature_id = Column(Integer, ForeignKey("feature.id"), nullable=False)
     well_id = Column(Integer, ForeignKey("wells.id"), nullable=False)
 
     replicate_index = Column(Integer, nullable=False, default=0)
