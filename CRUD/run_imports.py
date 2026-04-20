@@ -1,8 +1,10 @@
+import sys, os
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
+
 import pandas as pd
 from importers import import_management, import_specimen, import_measurement, import_wells, import_experiment
 import re
 from database import SessionLocal
-import os
 
 
 

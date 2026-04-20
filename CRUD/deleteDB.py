@@ -1,4 +1,7 @@
 # drop_db.py
+import sys, os
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
+
 from sqlalchemy_utils import database_exists, drop_database
 from sqlalchemy import text
 from database import SessionLocal, engine

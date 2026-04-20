@@ -13,7 +13,7 @@ In practice, this means:
 This guide explains the model from practical concepts first, then technical details.
 
 
-![alt text]({E227C008-C754-4550-BAF5-0325010BABA7}.png)
+![alt text](images/{E227C008-C754-4550-BAF5-0325010BABA7}.png)
 
 
 
@@ -32,7 +32,7 @@ Why it is central:
 Think of one row in `wells` as:
 "One position on one plate, containing one specimen, producing one experiment state and many measurements."
 
-![alt text]({7ECE9A34-5B26-4174-8791-76A0499EDCB6}.png)
+![alt text](images/{7ECE9A34-5B26-4174-8791-76A0499EDCB6}.png)
 
 #### Columns
 - `id`: Internal unique identifier of the well record.
@@ -90,7 +90,7 @@ Why this branch matters
 - Improves reproducibility by retaining plate-level source and image paths.
 - Captures imaging metadata in a normalized way (instrument -> channels -> antibody details).
 
-![alt text]({D17642E5-6E13-4DBC-870D-26978734BEE3}.png)
+![alt text](images/{D17642E5-6E13-4DBC-870D-26978734BEE3}.png)
 
 
 Connection to the core (`wells`):
@@ -150,6 +150,19 @@ Constraints:
 #### 3.1.3 `plates`
 One row represents one physical/experimental plate.
 
+Barcode policy:
+- A barcode defines a physical plate.
+- Plate barcode is unique in the database.
+- If an experiment on a plate is repeated, the new plate run must use a new barcode.
+
+Barcode components:
+- Project acronym: 3 uppercase letters (example: `IMX` for `immunx_meta`).
+- Project number: `PR` + 2 digits (example: `PR01`).
+- Sprint number: `S` + 2 digits (example: `S04`).
+- Run number: `R` + 2 digits (example: `R01`).
+- Plate number: lowercase `p` + 2 digits (example: `p06`).
+- Full example: `IMXPR01S04R01p06`.
+
 **Cardinality**: One plate -> many wells, many locations. Each plate belongs to exactly one screen and one project.
 
 Columns:
@@ -166,6 +179,9 @@ Constraints:
 - Barcode format: `<AAA>PR##S##R##p##`.
 	- Example: `IMXPR01S04R01p06`.
 	- If an experiment is repeated, a new barcode must be generated for the new physical plate.
+
+Consistency check script:
+- Use `check_barcode_consistency.py` to validate barcode format in a single value or across a CSV column.
 
 #### 3.1.4 `locations`
 One row stores file-system metadata for one plate.
@@ -336,7 +352,7 @@ Why this branch matters
   gracefully handling cases where the anticoagulant is not in PubChem.
 
 
-![alt text]({B2FD3E49-E01F-4EE8-86DE-B8F9176BBF49}.png)
+![alt text](images/{B2FD3E49-E01F-4EE8-86DE-B8F9176BBF49}.png)
 
 
 Connection to the core (`wells`):
@@ -519,7 +535,7 @@ Why this branch matters
 - Enforces one experiment record per well while allowing a condition to be reused across many wells.
 
 
-![alt text]({4D0184A7-735A-4B49-B4DF-A8376C8958C8}.png)
+![alt text](images/{4D0184A7-735A-4B49-B4DF-A8376C8958C8}.png)
 
 Connection to the core (`wells`):
 - `wells.experiment_id` -> `experiments.id`.
@@ -566,6 +582,12 @@ Columns:
 - `id`: Internal ID.
 - `name`: Condition class name.
 - `description`: Human-readable description.
+
+Recommended condition class values:
+- `naive`
+- `prim`
+- `prim_activ`
+- `activ`
 
 #### 5.1.3 `conditions`
 Represents one condition, which is an ordered sequence of treatment steps.
@@ -675,7 +697,7 @@ Why this branch matters
 
 
 
-![alt text]({E4319B01-76F0-444B-8838-C4B55E43B16A}.png)
+![alt text](images/{E4319B01-76F0-444B-8838-C4B55E43B16A}.png)
 
 Connection to the core (`wells`):
 - `measurement_values.well_id` -> `wells.id`.

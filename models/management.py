@@ -17,11 +17,13 @@ Cardinality:
 Key Design Decisions:
     - Project stores both a human-readable name and a unique group_name used by imports.
     - Screen numbers are unique only within a project, enforced by a composite unique constraint.
+    - Plate.barcode is the physical-plate identifier and must be unique.
+    - Plate barcode format is validated as: <ACRONYM>PR##S##R##p## (e.g., IMXPR01S04R01p06).
     - Plate links both to its screen and directly to its project for easier querying and import logic.
     - Location stores filesystem metadata related to a plate, such as image and source paths.
 """
 
-from sqlalchemy import Column, Integer, String, ForeignKey, UniqueConstraint
+from sqlalchemy import Column, Integer, String, ForeignKey, UniqueConstraint, CheckConstraint
 from sqlalchemy.orm import relationship
 from database import Base
 
@@ -60,7 +62,6 @@ class Screen(Base):
         id (int): Primary key.
         screen_number (int): Screen identifier unique within a project.
         screen_description (str): Optional descriptive text for the screen.
-        barcode (str): Optional barcode associated with the screen.
         project_id (int): Foreign key to the owning project.
 
     Relationships:
@@ -78,7 +79,6 @@ class Screen(Base):
     id = Column(Integer, primary_key=True)
     screen_number = Column(Integer, nullable=False)
     screen_description = Column(String)
-    barcode = Column(String)
     project_id = Column(Integer, ForeignKey('projects.id'))
 
     # Relationships
@@ -179,7 +179,7 @@ class Plate(Base):
     Attributes:
         id (int): Primary key.
         name (str): Plate name. Required.
-        barcode (str): Optional plate barcode.
+        barcode (str): Required unique plate barcode (physical-plate identifier).
         date_experiment (str): Experiment date associated with the plate.
         screen_id (int): Foreign key to the parent screen.
         project_id (int): Foreign key to the parent project.
@@ -192,9 +192,17 @@ class Plate(Base):
     """
 
     __tablename__ = 'plates'
+    __table_args__ = (
+        UniqueConstraint('barcode', name='uq_plate_barcode'),
+        CheckConstraint(
+            "barcode ~ '^[A-Z]{3}PR[0-9]{2}S[0-9]{2}R[0-9]{2}p[0-9]{2}$'",
+            name='ck_plate_barcode_format',
+        ),
+    )
+
     id = Column(Integer, primary_key=True)
     name = Column(String, nullable=False)
-    barcode = Column(String)
+    barcode = Column(String, nullable=False)
     date_experiment = Column(String)
     screen_id = Column(Integer, ForeignKey('screens.id'))
     project_id = Column(Integer, ForeignKey('projects.id'))
