@@ -1,3 +1,6 @@
+import sys, os
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
+
 from database import engine, Base, SessionLocal
 from models import *
 from CRUD import *
@@ -21,7 +24,8 @@ import toml
 from pprint import pprint
 
 
-with open("config.toml", "r") as file:
+_config_path = os.path.join(os.path.dirname(__file__), "..", "config.toml")
+with open(_config_path, "r") as file:
     config: dict = toml.load(file)
 
 

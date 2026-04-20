@@ -1,4 +1,7 @@
 # create_db.py
+import sys, os
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
+
 from database import engine, Base
 from models import *
 from sqlalchemy_utils import database_exists, create_database
