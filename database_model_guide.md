@@ -12,8 +12,7 @@ In practice, this means:
 
 This guide explains the model from practical concepts first, then technical details.
 
-
-![alt text](images/{E227C008-C754-4550-BAF5-0325010BABA7}.png)
+![alt text](images/{776B715A-A594-4416-8387-13DCD5A7A9F6}.png)
 
 
 
@@ -90,7 +89,10 @@ Why this branch matters
 - Improves reproducibility by retaining plate-level source and image paths.
 - Captures imaging metadata in a normalized way (instrument -> channels -> antibody details).
 
-![alt text](images/{D17642E5-6E13-4DBC-870D-26978734BEE3}.png)
+
+![alt text](images/{D2D24D2E-C31C-4157-8E34-B7ED2A2F2022}.png)
+
+
 
 
 Connection to the core (`wells`):
@@ -696,8 +698,9 @@ Why this branch matters
 	new measurement experiment types can be added without redesigning existing measurement storage.
 
 
+![alt text](images/{BD71E4A5-CBCC-4A17-BCD8-6FE786C4129F}.png)
 
-![alt text](images/{E4319B01-76F0-444B-8838-C4B55E43B16A}.png)
+
 
 Connection to the core (`wells`):
 - `measurement_values.well_id` -> `wells.id`.
@@ -719,7 +722,7 @@ Flow:
 ### 6.1 Measurement tables
 
 #### 6.1.1 `essay`
-Polymorphic base table for measurement experiment types.
+A unique biological/technical measurement context. Polymorphic base table for measurement experiment types.
 
 Columns:
 - `id`: Internal ID.
