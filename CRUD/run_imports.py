@@ -4,7 +4,11 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 import pandas as pd
 from importers import import_management, import_specimen, import_measurement, import_wells, import_experiment
 import re
-from database import SessionLocal
+from database import SessionLocal, engine
+
+
+# Keep ingestion output concise for batch runs.
+engine.echo = False
 
 
 
@@ -80,13 +84,12 @@ def run_import(
         df = df.head(int(max_rows_per_file))
 
     session = SessionLocal()
+    columns = list(df.columns)
 
-    for _, row in df.iterrows(): #df.head(150).iterrows():  #df.iterrows()
-        row = row.copy()
-        row_dict = row.to_dict()
+    for row_values in df.itertuples(index=False, name=None):
+        row_dict = dict(zip(columns, row_values))
 
         if specimen_type is not None:
-            row["specimen"] = specimen_type
             row_dict["specimen"] = specimen_type
 
         experiment_barcode = _row_get(row_dict, "barcode", "Barcode", required=True)
@@ -101,7 +104,7 @@ def run_import(
         # Management
         project = import_management.import_project(session, group_name or "Group name to be added", project_name)
         screen = import_management.import_screen(session, project, screen_number, screen_description)
-        plate = import_management.import_plate(session, screen, plate_num, plate_barcode, date_exp, project)
+        plate = import_management.import_plate(session, screen, plate_num, plate_barcode, date_exp)
         import_management.import_location(session, plate, img_path, source_path)
 
         # Specimen
@@ -130,8 +133,11 @@ FILES_CSV = r"/Users/pallottom\Documents/Projects/hi_dataB/ingestion_files.csv"
 
 if __name__ == "__main__":
     df = pd.read_csv(FILES_CSV)
+    ingestion_columns = list(df.columns)
 
-    for _, ingestion_row in df.iterrows(): #    for _, ingestion_row in df.iterrows():
+    for ingestion_values in df.itertuples(index=False, name=None):
+        ingestion_row = dict(zip(ingestion_columns, ingestion_values))
+
         filename = ingestion_row.get("file_name")
         if pd.isna(filename) or filename is None:
             filename = ingestion_row.get("File_name")
@@ -151,6 +157,7 @@ if __name__ == "__main__":
         if pd.isna(screen_description):
             screen_description = None
         full_path = os.path.join(BASE_PATH, filename)
+        print(f"[INGEST] {filename}")
         run_import(
             full_path,
             img_path=str(img_path),
@@ -159,7 +166,7 @@ if __name__ == "__main__":
             group_name=group_name,
             project_name=project_name,
             screen_description=screen_description,
-            max_rows_per_file=50,  # Set to None to process all rows, or a number to limit for testing
+            max_rows_per_file=None,  # Set to None to process all rows, or a number to limit for testing
         )
 
     print("✅ Data loading completed")

@@ -19,7 +19,7 @@ Key Design Decisions:
     - Screen numbers are unique only within a project, enforced by a composite unique constraint.
     - Plate.barcode is the physical-plate identifier and must be unique.
     - Plate barcode format is validated as: <ACRONYM>PR##S##R##p## (e.g., IMXPR01S04R01p06).
-    - Plate links both to its screen and directly to its project for easier querying and import logic.
+    - Plate belongs to a Screen; project membership is derived from Screen.project.
     - Location stores filesystem metadata related to a plate, such as image and source paths.
 """
 
@@ -52,7 +52,13 @@ class Project(Base):
     group_name = Column(String, unique=True)
 
     screens = relationship("Screen", back_populates="project")
-    plates = relationship("Plate", back_populates="project")
+    plates = relationship(
+        "Plate",
+        secondary="screens",
+        primaryjoin="Project.id == Screen.project_id",
+        secondaryjoin="Screen.id == Plate.screen_id",
+        viewonly=True,
+    )
 
 class Screen(Base):
     """
@@ -182,11 +188,11 @@ class Plate(Base):
         barcode (str): Required unique plate barcode (physical-plate identifier).
         date_experiment (str): Experiment date associated with the plate.
         screen_id (int): Foreign key to the parent screen.
-        project_id (int): Foreign key to the parent project.
+        project (Project): Derived relationship via the parent screen.
 
     Relationships:
         screen: Many-to-one. Each plate belongs to one screen.
-        project: Many-to-one. Each plate belongs to one project.
+        project: Derived many-to-one via screen.project (view-only).
         wells: One-to-many. A plate contains many wells.
         locations: One-to-many. A plate can have many location/file references.
     """
@@ -205,7 +211,6 @@ class Plate(Base):
     barcode = Column(String, nullable=False)
     date_experiment = Column(String)
     screen_id = Column(Integer, ForeignKey('screens.id'))
-    project_id = Column(Integer, ForeignKey('projects.id'))
 
     # Relationships
     # ============
@@ -214,7 +219,14 @@ class Plate(Base):
     screen = relationship("Screen", back_populates="plates")
     wells = relationship("Well", back_populates="plate")
     locations = relationship("Location", back_populates="plate")
-    project = relationship("Project", back_populates="plates")
+    project = relationship(
+        "Project",
+        secondary="screens",
+        primaryjoin="Plate.screen_id == Screen.id",
+        secondaryjoin="Screen.project_id == Project.id",
+        uselist=False,
+        viewonly=True,
+    )
 
 
 class Location(Base):

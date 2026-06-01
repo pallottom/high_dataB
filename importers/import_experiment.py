@@ -170,28 +170,26 @@ def import_experiment(session, row, well, measurement):
             duration_min=row.get("activ_time_min", 0),
         )
 
+    # --- QC status (stored on Well) ---
+    htrf_data_il1b = row.get("htrf_il1b_data")
+    htrf_data_tnfa = row.get("htrf_tnfa_data")
+    qc_status = "pass" if (pd.notna(htrf_data_il1b) or pd.notna(htrf_data_tnfa)) else "fail"
+    well.qc = qc_status
+
     # --- Experiment ---
-    experiment = None
-    if well.experiment_id is not None:
-        experiment = session.query(Experiment).filter_by(id=well.experiment_id).first()
+    experiment = session.query(Experiment).filter_by(well_id=well.id).first()
 
     if experiment is not None and experiment.condition_id != condition.id:
         experiment = None
     
     if not experiment:
-        htrf_data_il1b = row.get("htrf_il1b_data")
-        htrf_data_tnfa = row.get("htrf_tnfa_data")
-        qc_status = "pass" if (pd.notna(htrf_data_il1b) or pd.notna(htrf_data_tnfa)) else "fail"
-
         experiment = Experiment(
+            well_id=well.id,
             condition_id=condition.id,
             #measurement_id=measurement.id,
-            qc=qc_status
         )
         session.add(experiment)
-        session.flush()
-        well.experiment_id = experiment.id
-    elif well.experiment_id != experiment.id:
-        well.experiment_id = experiment.id
+    elif experiment.well_id != well.id:
+        experiment.well_id = well.id
 
     return experiment

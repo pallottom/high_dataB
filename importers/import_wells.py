@@ -3,6 +3,16 @@ from models import Well, specimen
 import re
 
 
+def _get_well_cache(session):
+    cache = session.info.get("well_cache")
+    if cache is not None:
+        return cache
+
+    cache = {}
+    session.info["well_cache"] = cache
+    return cache
+
+
 
 def _normalize_wellkey(well_key: str):
     """
@@ -42,11 +52,16 @@ def import_well(session, plate, well_key, specimen, screen=None):
     """Get or create a Well, reusing parsing logic from create_well."""
     normalized_well_key = _normalize_wellkey(well_key)
 
-    well = session.query(Well).filter_by(
-        well_key=normalized_well_key,
-        plate=plate,
-        specimen=specimen
-    ).first()
+    cache = _get_well_cache(session)
+    key = (plate.id, normalized_well_key, specimen.id if specimen is not None else None)
+    well = cache.get(key)
+
+    if well is None:
+        well = session.query(Well).filter_by(
+            well_key=normalized_well_key,
+            plate=plate,
+            specimen=specimen
+        ).first()
 
     if not well:
         well = Well(
@@ -58,5 +73,7 @@ def import_well(session, plate, well_key, specimen, screen=None):
         session.flush()
     elif well.specimen is None:
         well.specimen = specimen
+
+    cache[key] = well
 
     return well

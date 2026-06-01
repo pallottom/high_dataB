@@ -17,13 +17,13 @@ Cardinality:
     - One ConditionClass contains many Conditions.
     - One Condition contains many Treatments (ordered by position).
     - One Condition can be referenced by many Experiments.
-    - One Well has at most one Experiment (enforced by unique wells.experiment_id).
+    - One Well has at most one Experiment (enforced by unique experiments.well_id).
 
 Key Design Decisions:
     - Treatments are ordered using ordering_list on Treatment.position.
     - Treatment has a composite unique constraint to avoid duplicate treatment steps in a condition.
     - concentration_unit is restricted with a check constraint.
-    - Experiment uses a one-to-one link with Well via wells.experiment_id.
+    - Experiment owns the one-to-one link with Well via experiments.well_id.
 
 Note: Code adapted from screendb repo
 """
@@ -193,15 +193,15 @@ class Experiment(Base):
 
     Attributes:
         id (int): Primary key.
+        well_id (int): Foreign key to wells.id. Unique, enforcing one experiment per well.
         condition_id (int): Optional foreign key to conditions.id.
-        qc (str): Quality-control status (default 'pass').
 
     Relationships:
         well: One-to-one. Each well has at most one experiment.
         condition: Many-to-one. Optional assigned condition.
 
     Notes:
-        The unique constraint on wells.experiment_id enforces one experiment record per well.
+        The unique constraint on experiments.well_id enforces one experiment record per well.
 
     Original note:
         An Experiment is a certain state of a Well. An Experiment includes
@@ -211,9 +211,9 @@ class Experiment(Base):
     """
     __tablename__ = 'experiments'
     id = Column(Integer, primary_key=True)
+    well_id = Column(Integer, ForeignKey('wells.id'), unique=True, nullable=False)
     #measurement_id = Column(Integer, ForeignKey('measurements.id'), nullable=False)
     condition_id = Column(Integer, ForeignKey('conditions.id'))
-    qc = Column(String(4), nullable=False, default='pass')
-    well = relationship("Well", back_populates="experiment", uselist=False, foreign_keys="Well.experiment_id")
+    well = relationship("Well", back_populates="experiment", uselist=False)
     #measurement = relationship("Measurement", back_populates="experiments")
     condition = relationship("Condition", back_populates="experiments")
