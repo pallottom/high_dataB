@@ -94,6 +94,15 @@ class CellCompartment(Base):
 class IMMUNX(Essay):
     __tablename__ = "immunx"
 
+    __table_args__ = (
+        UniqueConstraint(
+            "target_id",
+            "population_id",
+            "cell_compartment_id",
+            name="uq_immunx_target_population_compartment",
+        ),
+    )
+
     id = Column(Integer, ForeignKey("essay.id"), primary_key=True)
     emission = Column(Float, nullable=True)
     target_id = Column(Integer, ForeignKey("target.id"), nullable=True)

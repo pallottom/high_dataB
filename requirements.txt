@@ -1,6 +1,7 @@
 pandas
 SQLAlchemy
 sqlalchemy-utils
-dotenv
+python-dotenv
 toml
 pytest
+psycopg2-binary

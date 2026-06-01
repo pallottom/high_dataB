@@ -14,6 +14,35 @@ from models import (
 )
 
 
+_COLUMN_MAPPING_CACHE = None
+
+
+def _get_measurement_cache(session: Session):
+    cache = session.info.get("measurement_cache")
+    if cache is not None:
+        return cache
+
+    targets_by_name = {obj.name: obj for obj in session.query(Target).all()}
+    populations_by_name = {obj.name: obj for obj in session.query(Population).all()}
+    compartments_by_name = {obj.name: obj for obj in session.query(CellCompartment).all()}
+    features_by_key = {obj.key: obj for obj in session.query(PrimaryFeature).all()}
+
+    immunx_by_identity = {}
+    for obj in session.query(IMMUNX).all():
+        key = (obj.target_id, obj.population_id, obj.cell_compartment_id, obj.emission)
+        immunx_by_identity[key] = obj
+
+    cache = {
+        "targets_by_name": targets_by_name,
+        "populations_by_name": populations_by_name,
+        "compartments_by_name": compartments_by_name,
+        "features_by_key": features_by_key,
+        "immunx_by_identity": immunx_by_identity,
+    }
+    session.info["measurement_cache"] = cache
+    return cache
+
+
 def _normalize_text(value):
     if value is None or pd.isna(value):
         return None
@@ -31,6 +60,10 @@ def _to_float(value):
 
 
 def _load_column_mapping():
+    global _COLUMN_MAPPING_CACHE
+    if _COLUMN_MAPPING_CACHE is not None:
+        return _COLUMN_MAPPING_CACHE
+
     mapping_path = Path(__file__).resolve().parent.parent / "config" / "column_mapping.csv"
 
     with mapping_path.open("r", encoding="utf-8-sig", newline="") as f:
@@ -79,7 +112,8 @@ def _load_column_mapping():
             }
         )
 
-    return rows
+    _COLUMN_MAPPING_CACHE = rows
+    return _COLUMN_MAPPING_CACHE
 
 
 def _lookup_row_value(row: dict, source_column: str):
@@ -96,36 +130,51 @@ def _lookup_row_value(row: dict, source_column: str):
 def _get_or_create_target(session: Session, name: str | None):
     if not name:
         return None
-    target = session.query(Target).filter_by(name=name).first()
+    cache = _get_measurement_cache(session)
+    target = cache["targets_by_name"].get(name)
+    if target is None:
+        target = session.query(Target).filter_by(name=name).first()
     if target:
+        cache["targets_by_name"][name] = target
         return target
     target = Target(name=name)
     session.add(target)
     session.flush()
+    cache["targets_by_name"][name] = target
     return target
 
 
 def _get_or_create_population(session: Session, name: str | None):
     if not name:
         return None
-    population = session.query(Population).filter_by(name=name).first()
+    cache = _get_measurement_cache(session)
+    population = cache["populations_by_name"].get(name)
+    if population is None:
+        population = session.query(Population).filter_by(name=name).first()
     if population:
+        cache["populations_by_name"][name] = population
         return population
     population = Population(name=name)
     session.add(population)
     session.flush()
+    cache["populations_by_name"][name] = population
     return population
 
 
 def _get_or_create_cell_compartment(session: Session, name: str | None):
     if not name:
         return None
-    compartment = session.query(CellCompartment).filter_by(name=name).first()
+    cache = _get_measurement_cache(session)
+    compartment = cache["compartments_by_name"].get(name)
+    if compartment is None:
+        compartment = session.query(CellCompartment).filter_by(name=name).first()
     if compartment:
+        cache["compartments_by_name"][name] = compartment
         return compartment
     compartment = CellCompartment(name=name)
     session.add(compartment)
     session.flush()
+    cache["compartments_by_name"][name] = compartment
     return compartment
 
 
@@ -138,17 +187,23 @@ def _get_or_create_primary_feature(
     key = source_column
     name = feature_name or source_column
 
-    feature = session.query(PrimaryFeature).filter_by(key=key).first()
+    cache = _get_measurement_cache(session)
+    feature = cache["features_by_key"].get(key)
+    if feature is None:
+        feature = session.query(PrimaryFeature).filter_by(key=key).first()
+
     if feature:
         if feature_name and feature.name != name:
             feature.name = name
         if unit and feature.unit != unit:
             feature.unit = unit
+        cache["features_by_key"][key] = feature
         return feature
 
     feature = PrimaryFeature(key=key, name=name, unit=unit)
     session.add(feature)
     session.flush()
+    cache["features_by_key"][key] = feature
     return feature
 
 
@@ -159,17 +214,23 @@ def _get_or_create_immunx_experiment(
     cell_compartment_id: int | None,
     emission: float | None,
 ):
-    experiment = (
-        session.query(IMMUNX)
-        .filter_by(
-            target_id=target_id,
-            population_id=population_id,
-            cell_compartment_id=cell_compartment_id,
-            emission=emission,
+    cache = _get_measurement_cache(session)
+    key = (target_id, population_id, cell_compartment_id, emission)
+    experiment = cache["immunx_by_identity"].get(key)
+    if experiment is None:
+        experiment = (
+            session.query(IMMUNX)
+            .filter_by(
+                target_id=target_id,
+                population_id=population_id,
+                cell_compartment_id=cell_compartment_id,
+                emission=emission,
+            )
+            .first()
         )
-        .first()
-    )
+
     if experiment:
+        cache["immunx_by_identity"][key] = experiment
         return experiment
 
     experiment = IMMUNX(
@@ -181,6 +242,7 @@ def _get_or_create_immunx_experiment(
     )
     session.add(experiment)
     session.flush()
+    cache["immunx_by_identity"][key] = experiment
     return experiment
 
 
@@ -197,7 +259,9 @@ def import_measurement(session: Session, row: dict):
         raise ValueError("import_measurement requires row['__well'] with a Well instance")
 
     mapping_rows = _load_column_mapping()
-    created_or_updated = []
+    resolved_rows = []
+    essay_ids = set()
+    feature_ids = set()
 
     for mapping in mapping_rows:
         source_column = mapping["source_column"]
@@ -224,35 +288,77 @@ def import_measurement(session: Session, row: dict):
             unit=mapping["unit"],
         )
 
-        measurement = (
-            session.query(MeasurementValue)
-            .filter_by(
-                well_id=well.id,
-                essay_id=experiment.id,
-                feature_id=feature.id,
-                replicate_index=0,
-            )
-            .first()
+        essay_ids.add(experiment.id)
+        feature_ids.add(feature.id)
+        resolved_rows.append(
+            {
+                "well_id": well.id,
+                "essay_id": experiment.id,
+                "feature_id": feature.id,
+                "replicate_index": 0,
+                "value": numeric_value,
+            }
         )
 
-        if measurement is None:
-            measurement = MeasurementValue(
-                value=numeric_value,
-                essay_id=experiment.id,
-                feature_id=feature.id,
-                well_id=well.id,
-                replicate_index=0,
-            )
-            session.add(measurement)
+    if not resolved_rows:
+        return None
+
+    existing_rows = (
+        session.query(
+            MeasurementValue.id,
+            MeasurementValue.well_id,
+            MeasurementValue.essay_id,
+            MeasurementValue.feature_id,
+            MeasurementValue.replicate_index,
+        )
+        .filter(
+            MeasurementValue.well_id == well.id,
+            MeasurementValue.replicate_index == 0,
+            MeasurementValue.essay_id.in_(essay_ids),
+            MeasurementValue.feature_id.in_(feature_ids),
+        )
+        .all()
+    )
+
+    existing_by_identity = {
+        (m.well_id, m.essay_id, m.feature_id, m.replicate_index): m.id
+        for m in existing_rows
+    }
+
+    insert_mappings = []
+    update_mappings = []
+    for row_mapping in resolved_rows:
+        identity = (
+            row_mapping["well_id"],
+            row_mapping["essay_id"],
+            row_mapping["feature_id"],
+            row_mapping["replicate_index"],
+        )
+        existing_id = existing_by_identity.get(identity)
+
+        if existing_id is None:
+            insert_mappings.append(row_mapping)
         else:
-            measurement.value = numeric_value
+            update_mappings.append(
+                {
+                    "id": existing_id,
+                    "value": row_mapping["value"],
+                }
+            )
 
-        created_or_updated.append(measurement)
+    if insert_mappings:
+        session.bulk_insert_mappings(MeasurementValue, insert_mappings)
 
-    if created_or_updated:
-        session.flush()
-        return created_or_updated[0]
-    return None
+    if update_mappings:
+        session.bulk_update_mappings(MeasurementValue, update_mappings)
+
+    session.flush()
+    return (
+        session.query(MeasurementValue)
+        .filter_by(well_id=well.id)
+        .order_by(MeasurementValue.id.asc())
+        .first()
+    )
 
 
 def get_or_create_default_measurement(session: Session, well, row=None):

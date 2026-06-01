@@ -15,7 +15,8 @@ Key Design Decisions:
     - well_key is the canonical coordinate (e.g., A01, B12) — row and column are derived from this, not stored.
     - plate_id is non-null because every well must belong to a plate.
     - specimen_id is non-null because a well must always hold a specimen.
-    - experiment_id is an optional one-to-one link to experiments.id.
+    - qc stores per-well quality-control status ('pass' or 'fail').
+    - One-to-one link to Experiment is owned by experiments.well_id (unique FK).
     - UniqueConstraint(plate_id, well_key) prevents duplicate well coordinates within the same plate.
     - Indexes on plate_id and specimen_id optimize FK lookups for high-throughput queries.
 """
@@ -36,7 +37,7 @@ class Well(Base):
                        Format is derived from (row, column) but not stored separately to avoid redundancy.
         specimen_id (int): Foreign key to specimens table. Non-null; every well must hold a specimen.
         plate_id (int): Foreign key to plates table. Non-null; every well must belong to a plate.
-        experiment_id (int): Optional foreign key to experiments.id.
+        qc (str): Quality-control status for this well ('pass' or 'fail').
     
     Relationships:
         plate: Many-to-one. This well belongs to exactly one plate.
@@ -76,8 +77,8 @@ class Well(Base):
     # This is the table context that gives the well its meaning within a screening run.
     plate_id = Column(Integer, ForeignKey('plates.id'), nullable=False)
 
-    # Optional one-to-one link to experiment state.
-    experiment_id = Column(Integer, ForeignKey('experiments.id'), unique=True)
+    # QC status stored at the well level.
+    qc = Column(String(4), nullable=False, default='pass')
 
     # Relationships
     # ============
@@ -90,12 +91,12 @@ class Well(Base):
     # Specimen.wells provides the reverse (one specimen appears in many wells across different plates).
     specimen = relationship("Specimen", back_populates="wells")
     
-    # One-to-one: This well has at most one Experiment state record (uselist=False enforces singular).
-    # Experiment.well provides the reverse. Useful for storing QC pass/fail status per well.
-    experiment = relationship("Experiment", back_populates="well", uselist=False, foreign_keys=[experiment_id])
+    # One-to-one: This well has at most one Experiment state record.
+    # The FK is stored on Experiment.well_id and is unique there.
+    experiment = relationship("Experiment", back_populates="well", uselist=False)
     
     # One-to-many: This well can have multiple numeric measurement values.
     # MeasurementValue.well provides the reverse.
     measurements = relationship("MeasurementValue", back_populates="well")
     
-    # experiment_id is stored directly on the well as the one-to-one experiment link.
+    # One-to-one ownership is enforced on Experiment via well_id.
