@@ -10,8 +10,10 @@ load_dotenv()
 # Get the current environment (default to 'development')
 ENVIRONMENT = os.getenv("ENVIRONMENT", "development")
 
-# Load config from TOML file
-with open("config.toml", "r") as config_file:
+# Load config from TOML file using a path relative to this file.
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+CONFIG_PATH = os.path.join(BASE_DIR, "config.toml")
+with open(CONFIG_PATH, "r") as config_file:
     config = toml.load(config_file)
 
 # Get environment-specific config
