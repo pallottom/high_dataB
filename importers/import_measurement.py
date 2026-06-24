@@ -64,7 +64,7 @@ def _load_column_mapping():
     if _COLUMN_MAPPING_CACHE is not None:
         return _COLUMN_MAPPING_CACHE
 
-    mapping_path = Path(__file__).resolve().parent.parent / "config" / "column_mapping.csv"
+    mapping_path = Path(__file__).resolve().parent.parent / "column_mapping.csv"
 
     with mapping_path.open("r", encoding="utf-8-sig", newline="") as f:
         reader = csv.reader(f)
@@ -248,7 +248,7 @@ def _get_or_create_immunx_experiment(
 
 def import_measurement(session: Session, row: dict):
     """
-    Import measurements from one row using config/column_mapping.csv.
+    Import measurements from one row using column_mapping.csv in the repo root.
     Default essay type is IMMUNX.
 
     Required input:

@@ -99,6 +99,7 @@ class IMMUNX(Essay):
             "target_id",
             "population_id",
             "cell_compartment_id",
+            "emission",
             name="uq_immunx_target_population_compartment",
         ),
     )

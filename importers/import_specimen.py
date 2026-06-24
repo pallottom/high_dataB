@@ -30,6 +30,16 @@ def _to_optional_int(value):
         return None
 
 
+def _to_optional_float(value):
+    value = _none_if_missing(value)
+    if value is None:
+        return None
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return None
+
+
 def _to_optional_str(value):
     value = _none_if_missing(value)
     if value is None:
@@ -182,10 +192,14 @@ def import_specimen(session: Session, row: dict):
         if specimen:
             specimen.anticoagulant = anticoagulant
         if not specimen:
+            height_value = row.get("height_cm")
+            if height_value is None:
+                height_value = row.get("hight_cm")
+
             specimen = HumanDonor(
                 name=donor_name,
-                weight_kg=_none_if_missing(row.get("weight_kg")),
-                height_cm=_none_if_missing(row.get("height_cm")),
+                weight_kg=_to_optional_float(row.get("weight_kg")),
+                height_cm=_to_optional_float(height_value),
                 smoker=_parse_binary(row.get("smoker")),
                 ethnicity=_to_optional_str(row.get("ethnicity")),
                 blood_type=_to_optional_str(row.get("blood_type")),

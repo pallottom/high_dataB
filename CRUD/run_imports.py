@@ -11,6 +11,22 @@ from database import SessionLocal, engine
 engine.echo = False
 
 
+def _none_if_missing(value):
+    if value is None:
+        return None
+    try:
+        if value != value:
+            return None
+    except Exception:
+        pass
+
+    text = str(value).strip()
+    if text == "" or text.lower() == "nan":
+        return None
+
+    return text
+
+
 
 def _parse_barcode(barcode):
     """
@@ -68,10 +84,35 @@ def _row_get(row_dict, *candidates, default=None, required=False):
     return default
 
 
+def _build_barcode_img_path_map(csv_path, barcode_candidates=None, path_candidates=None):
+    if barcode_candidates is None:
+        barcode_candidates = ("barcode", "Barcode")
+    if path_candidates is None:
+        path_candidates = ("path_to_rawdata", "img_path")
+
+    if not os.path.exists(csv_path):
+        return {}
+
+    df = pd.read_csv(csv_path)
+    columns = list(df.columns)
+    mapping = {}
+
+    for row_values in df.itertuples(index=False, name=None):
+        row_dict = dict(zip(columns, row_values))
+        barcode = _none_if_missing(_row_get(row_dict, *barcode_candidates, default=None))
+        img_path = _none_if_missing(_row_get(row_dict, *path_candidates, default=None))
+
+        if barcode and img_path and barcode not in mapping:
+            mapping[barcode] = img_path
+
+    return mapping
+
+
 
 def run_import(
     csv_file,
     img_path=None,
+    img_path_by_barcode=None,
     source_path=None,
     specimen_type=None,
     group_name=None,
@@ -97,6 +138,14 @@ def run_import(
         well_key = _row_get(row_dict, "wellname", "well_name", "well", required=True)
         date_exp = _row_get(row_dict, "date_exp", "date", default="unknown_date")
 
+        current_img_path = _none_if_missing(_row_get(row_dict, "path_to_rawdata", "img_path", default=None))
+        if current_img_path is None and img_path_by_barcode is not None:
+            current_img_path = _none_if_missing(img_path_by_barcode.get(str(experiment_barcode).strip()))
+        if current_img_path is None:
+            current_img_path = _none_if_missing(img_path)
+        if current_img_path is None:
+            current_img_path = ""
+
 
         prefix, project_num, screen_number, run_num, plate_num = _parse_barcode(experiment_barcode)
 
@@ -105,7 +154,7 @@ def run_import(
         project = import_management.import_project(session, group_name or "Group name to be added", project_name)
         screen = import_management.import_screen(session, project, screen_number, screen_description)
         plate = import_management.import_plate(session, screen, plate_num, plate_barcode, date_exp)
-        import_management.import_location(session, plate, img_path, source_path)
+        import_management.import_location(session, plate, current_img_path, source_path)
 
         # Specimen
         specimen = import_specimen.import_specimen(session, row_dict)
@@ -128,10 +177,24 @@ def run_import(
 
 
 
-BASE_PATH = r"/Users/pallottom/Documents/Projects/test_DB/data/"
+BASE_PATH = r"C:/Users/pallottom/Documents/Projects/hi_dataB/data_small"
 FILES_CSV = r"/Users/pallottom\Documents/Projects/hi_dataB/ingestion_files.csv"
+DONOR_PANEL_METADATA_CSV = r"/Users/pallottom/Documents/Projects/hi_dataB/data_small/PlatebasedScreeninglist_Donorpanel_20200819.csv"
 
 if __name__ == "__main__":
+    donor_panel_img_by_barcode = _build_barcode_img_path_map(
+        DONOR_PANEL_METADATA_CSV,
+        barcode_candidates=("barcode", "Barcode"),
+        path_candidates=("path_to_rawdata",),
+    )
+    ingestion_img_by_barcode = _build_barcode_img_path_map(
+        FILES_CSV,
+        barcode_candidates=("barcode", "Barcode"),
+        path_candidates=("img_path",),
+    )
+    combined_img_by_barcode = dict(ingestion_img_by_barcode)
+    combined_img_by_barcode.update(donor_panel_img_by_barcode)
+
     df = pd.read_csv(FILES_CSV)
     ingestion_columns = list(df.columns)
 
@@ -161,6 +224,7 @@ if __name__ == "__main__":
         run_import(
             full_path,
             img_path=str(img_path),
+            img_path_by_barcode=combined_img_by_barcode,
             source_path=str(filename),
             specimen_type=str(specimen_type).strip().lower(),
             group_name=group_name,

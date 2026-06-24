@@ -35,7 +35,7 @@ log_level = "INFO"
 type = "postgresql"
 host = "localhost"
 port = 5432
-name = "hi_dataB_test"
+name = "hi_dataB_dev"
 user = "postgres"
 password = "postgres"
 
